@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ultimate Student Planner | All-in-One Study System</title>
+  <meta name="description" content="Plan assignments, exams, study sessions, habits, budgets and workouts in one organized system built for students." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- Sidebar -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <div class="workspace-icon">🎓</div>
+      <div class="workspace-info">
+        <span class="workspace-name">My Study Space</span>
+        <span class="workspace-sub" id="semesterLabel">Academic Year 2025–26</span>
+      </div>
+      <button class="sidebar-toggle" id="sidebarToggle" title="Collapse sidebar">‹</button>
+    </div>
+
+    <div class="sidebar-search">
+      <span class="search-icon">🔍</span>
+      <input type="text" placeholder="Search..." id="searchInput" />
+    </div>
+
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">WORKSPACE</div>
+      <a href="#" class="nav-item active" data-view="dashboard">
+        <span class="nav-icon">🏠</span> Dashboard
+      </a>
+      <a href="#" class="nav-item" data-view="assignments">
+        <span class="nav-icon">📝</span> Assignments
+        <span class="nav-badge" id="badge-assignments"></span>
+      </a>
+      <a href="#" class="nav-item" data-view="exams">
+        <span class="nav-icon">📋</span> Exams
+        <span class="nav-badge" id="badge-exams"></span>
+      </a>
+      <a href="#" class="nav-item" data-view="courses">
+        <span class="nav-icon">📚</span> Courses
+      </a>
+      <a href="#" class="nav-item" data-view="planner">
+        <span class="nav-icon">🗓️</span> Weekly Planner
+      </a>
+      <a href="#" class="nav-item" data-view="habits">
+        <span class="nav-icon">🎯</span> Habit Tracker
+      </a>
+      <a href="#" class="nav-item" data-view="workout">
+        <span class="nav-icon">💪</span> Workout
+      </a>
+      <a href="#" class="nav-item" data-view="budget">
+        <span class="nav-icon">💰</span> Budget
+      </a>
+      <a href="#" class="nav-item" data-view="notes">
+        <span class="nav-icon">🗒️</span> Notes
+      </a>
+
+      <div class="nav-section-label" style="margin-top: 20px;">QUICK ADD</div>
+      <button class="nav-item-btn" id="quickAddAssignment">
+        <span class="nav-icon">＋</span> New Assignment
+      </button>
+      <button class="nav-item-btn" id="quickAddExam">
+        <span class="nav-icon">＋</span> New Exam
+      </button>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="progress-label">
+        <span>Semester Progress</span>
+        <span id="semesterPct">—</span>
+      </div>
+      <div class="progress-bar-wrap">
+        <div class="progress-bar-fill" id="semesterProgress" style="width: 0%"></div>
+      </div>
+      <button class="btn btn-sm btn-outline" id="semesterSettingsBtn" style="width:100%;margin-top:10px;font-size:11px;">⚙️ Semester Settings</button>
+    </div>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="main" id="mainContent">
+
+    <!-- Top Bar -->
+    <header class="topbar">
+      <button class="menu-btn" id="menuBtn" title="Toggle menu">☰</button>
+      <div class="topbar-breadcrumb" id="topbarBreadcrumb">🏠 Dashboard</div>
+      <div class="topbar-actions">
+        <span class="current-date" id="currentDate"></span>
+        <button class="btn btn-primary" id="topAddBtn">+ Add Item</button>
+        <button class="theme-toggle" id="themeToggle" title="Toggle theme">🌙</button>
+      </div>
+    </header>
+
+    <!-- DASHBOARD VIEW -->
+    <section class="view active" id="view-dashboard">
+      <div class="page-header">
+        <h1>🏠 Dashboard</h1>
+        <p class="page-sub">Welcome back! Here's your study overview.</p>
+      </div>
+
+      <div class="stats-grid">
+        <div class="stat-card stat-purple">
+          <div class="stat-icon">📝</div>
+          <div class="stat-content">
+            <div class="stat-value" id="stat-pending">0</div>
+            <div class="stat-label">Pending Assignments</div>
+          </div>
+        </div>
+        <div class="stat-card stat-blue">
+          <div class="stat-icon">📋</div>
+          <div class="stat-content">
+            <div class="stat-value" id="stat-exams">0</div>
+            <div class="stat-label">Upcoming Exams</div>
+          </div>
+        </div>
+        <div class="stat-card stat-green">
+          <div class="stat-icon">✅</div>
+          <div class="stat-content">
+            <div class="stat-value" id="stat-done">0</div>
+            <div class="stat-label">Completed Tasks</div>
+          </div>
+        </div>
+        <div class="stat-card stat-orange">
+          <div class="stat-icon">🎯</div>
+          <div class="stat-content">
+            <div class="stat-value" id="stat-habits">0%</div>
+            <div class="stat-label">Habits Done Today</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Semester Progress Banner -->
+      <div class="semester-banner" id="semesterBanner" style="display:none;">
+        <div class="semester-banner-info">
+          <span class="semester-banner-label" id="sbLabel">Semester</span>
+          <span class="semester-banner-dates" id="sbDates"></span>
+        </div>
+        <div class="semester-banner-bar-wrap">
+          <div class="semester-banner-fill" id="sbFill" style="width:0%"></div>
+        </div>
+        <div class="semester-banner-pct" id="sbPct">0%</div>
+      </div>
+
+      <div class="two-col">
+        <div class="card">
+          <div class="card-header">
+            <h2>⏰ Upcoming Deadlines</h2>
+            <button class="card-action" data-view="assignments">View all →</button>
+          </div>
+          <div class="deadline-list" id="deadlineList">
+            <div class="empty-state"><span>📭</span><p>No upcoming deadlines.</p></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <h2>📋 Exam Countdown</h2>
+            <button class="card-action" data-view="exams">View all →</button>
+          </div>
+          <div class="exam-list" id="examCountdownList">
+            <div class="empty-state"><span>📭</span><p>No exams scheduled.</p></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="two-col" style="margin-top: 24px;">
+        <div class="card">
+          <div class="card-header">
+            <h2>📅 Today's Study Sessions</h2>
+            <button class="card-action" data-view="planner">Open planner →</button>
+          </div>
+          <div id="studySessionList" class="deadline-list">
+            <div class="empty-state"><span>🌅</span><p>No sessions planned today.</p></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <h2>💪 Today's Workout</h2>
+            <button class="card-action" data-view="workout">Full tracker →</button>
+          </div>
+          <div id="dashWorkoutSummary" class="deadline-list">
+            <div class="empty-state"><span>🏋️</span><p>No workout logged today.</p></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="two-col" style="margin-top:24px;">
+        <div class="card">
+          <div class="card-header">
+            <h2>🗒️ Quick Note</h2>
+            <button class="card-action" data-view="notes">All notes →</button>
+          </div>
+          <textarea class="quick-note-area" id="quickNote" placeholder="Jot down a quick thought..."></textarea>
+          <div class="quick-note-actions">
+            <button class="btn btn-sm btn-outline" id="clearNote">Clear</button>
+            <button class="btn btn-sm btn-primary" id="saveNote">Save Note →</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <h2>🎯 Today's Habits</h2>
+            <button class="card-action" data-view="habits">Full tracker →</button>
+          </div>
+          <div class="habit-mini-grid" id="habitMiniGrid">
+            <div class="empty-state"><span>🌱</span><p>No habits added yet. Go to Habit Tracker!</p></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ASSIGNMENTS VIEW -->
+    <section class="view" id="view-assignments">
+      <div class="page-header">
+        <h1>📝 Assignments</h1>
+        <p class="page-sub">Track all your assignments and deadlines.</p>
+      </div>
+      <div class="filter-bar">
+        <div class="filter-group" id="assignmentFilterGroup">
+          <button class="filter-btn active" data-filter="all">All</button>
+          <button class="filter-btn" data-filter="not-started">Not Started</button>
+          <button class="filter-btn" data-filter="in-progress">In Progress</button>
+          <button class="filter-btn" data-filter="done">Done</button>
+        </div>
+        <div class="filter-group">
+          <select class="filter-select" id="filterCourse"><option value="">All Courses</option></select>
+          <button class="btn btn-primary" id="addAssignmentBtn">+ Add Assignment</button>
+        </div>
+      </div>
+      <div class="table-wrapper">
+        <table class="data-table">
+          <thead><tr><th>Title</th><th>Course</th><th>Due Date</th><th>Priority</th><th>Status</th><th>Actions</th></tr></thead>
+          <tbody id="assignmentTbody">
+            <tr class="empty-row"><td colspan="6"><div class="empty-state"><span>📭</span><p>No assignments yet. Click "Add Assignment"!</p></div></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- EXAMS VIEW -->
+    <section class="view" id="view-exams">
+      <div class="page-header">
+        <h1>📋 Exams</h1>
+        <p class="page-sub">Keep track of all your upcoming exams.</p>
+      </div>
+      <div class="filter-bar">
+        <div class="filter-group" id="examFilterGroup">
+          <button class="filter-btn active" data-exam-filter="all">All</button>
+          <button class="filter-btn" data-exam-filter="upcoming">Upcoming</button>
+          <button class="filter-btn" data-exam-filter="passed">Passed</button>
+        </div>
+        <button class="btn btn-primary" id="addExamBtn">+ Add Exam</button>
+      </div>
+      <div class="exam-cards-grid" id="examCardsGrid">
+        <div class="empty-state full-empty"><span>📭</span><p>No exams added yet.</p></div>
+      </div>
+    </section>
+
+    <!-- COURSES VIEW -->
+    <section class="view" id="view-courses">
+      <div class="page-header">
+        <h1>📚 Courses</h1>
+        <p class="page-sub">Manage your courses and track grades.</p>
+      </div>
+      <div class="filter-bar">
+        <div></div>
+        <button class="btn btn-primary" id="addCourseBtn">+ Add Course</button>
+      </div>
+      <div class="courses-grid" id="coursesGrid">
+        <div class="empty-state full-empty"><span>📭</span><p>No courses added yet.</p></div>
+      </div>
+    </section>
+
+    <!-- WEEKLY PLANNER VIEW -->
+    <section class="view" id="view-planner">
+      <div class="page-header">
+        <h1>🗓️ Weekly Planner</h1>
+        <p class="page-sub">Plan your week, session by session.</p>
+      </div>
+      <div class="week-nav">
+        <button class="btn btn-outline" id="prevWeek">← Prev</button>
+        <span class="week-label" id="weekLabel"></span>
+        <button class="btn btn-outline" id="nextWeek">Next →</button>
+        <button class="btn btn-primary" id="addSessionBtn">+ Add Session</button>
+      </div>
+      <div class="weekly-grid-scroll">
+        <div class="weekly-grid" id="weeklyGrid"></div>
+      </div>
+    </section>
+
+    <!-- HABIT TRACKER VIEW -->
+    <section class="view" id="view-habits">
+      <div class="page-header">
+        <h1>🎯 Habit Tracker</h1>
+        <p class="page-sub">Build winning habits, one day at a time.</p>
+      </div>
+      <div class="filter-bar">
+        <div class="week-nav" style="gap:12px;">
+          <button class="btn btn-outline" id="prevHabitMonth">← Prev</button>
+          <span class="week-label" id="habitMonthLabel"></span>
+          <button class="btn btn-outline" id="nextHabitMonth">Next →</button>
+        </div>
+        <button class="btn btn-primary" id="addHabitBtn">+ Add Habit</button>
+      </div>
+      <div class="habit-tracker-table" id="habitTrackerTable"></div>
+    </section>
+
+    <!-- ==================== WORKOUT VIEW ==================== -->
+    <section class="view" id="view-workout">
+      <div class="page-header">
+        <h1>💪 Workout Tracker</h1>
+        <p class="page-sub">Log gym sessions, badminton, manage machines and your workout plan.</p>
+      </div>
+
+      <!-- Sub-tabs -->
+      <div class="sub-tabs" id="workoutSubTabs">
+        <button class="sub-tab active" data-subtab="today">📅 Today</button>
+        <button class="sub-tab" data-subtab="plan">📋 Workout Plan</button>
+        <button class="sub-tab" data-subtab="machines">🏋️ Machines</button>
+        <button class="sub-tab" data-subtab="badminton">🏸 Badminton</button>
+        <button class="sub-tab" data-subtab="history">🗂️ History</button>
+      </div>
+
+      <!-- TODAY SUB-TAB -->
+      <div class="subtab-panel active" id="subtab-today">
+        <div class="two-col" style="margin-bottom:20px;">
+          <div class="card">
+            <div class="card-header">
+              <h2>🏋️ Gym Session — Today</h2>
+              <button class="btn btn-sm btn-primary" id="logGymBtn">+ Log Gym</button>
+            </div>
+            <div id="todayGymLog">
+              <div class="empty-state"><span>🏋️</span><p>No gym session logged today.</p></div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-header">
+              <h2>🏸 Badminton — Today</h2>
+              <button class="btn btn-sm btn-primary" id="logBadmintonBtn">+ Log Badminton</button>
+            </div>
+            <div id="todayBadmintonLog">
+              <div class="empty-state"><span>🏸</span><p>No badminton session logged today.</p></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Today's Plan exercises -->
+        <div class="card">
+          <div class="card-header">
+            <h2>📋 Today's Planned Exercises</h2>
+            <span id="todayPlanDayLabel" style="font-size:12px;color:var(--text-muted);"></span>
+          </div>
+          <div id="todayPlanExercises">
+            <div class="empty-state"><span>📋</span><p>No workout plan assigned for today. Go to "Workout Plan" to create one.</p></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- WORKOUT PLAN SUB-TAB -->
+      <div class="subtab-panel" id="subtab-plan">
+        <div class="filter-bar">
+          <div class="filter-group">
+            <select class="filter-select" id="activePlanSelect">
+              <option value="">— Select active plan —</option>
+            </select>
+          </div>
+          <div class="filter-group">
+            <button class="btn btn-outline" id="addPlanBtn">+ New Plan</button>
+            <button class="btn btn-primary" id="setActivePlanBtn">✅ Set as Active</button>
+          </div>
+        </div>
+        <div id="planEditor">
+          <div class="empty-state full-empty"><span>📋</span><p>No plan selected. Create or select a workout plan.</p></div>
+        </div>
+      </div>
+
+      <!-- MACHINES SUB-TAB -->
+      <div class="subtab-panel" id="subtab-machines">
+        <div class="filter-bar">
+          <div class="filter-group" id="machineFilterGroup">
+            <button class="filter-btn active" data-machine-filter="all">All</button>
+            <button class="filter-btn" data-machine-filter="Cardio">❤️ Cardio</button>
+            <button class="filter-btn" data-machine-filter="Strength">💪 Strength</button>
+            <button class="filter-btn" data-machine-filter="Flexibility">🧘 Flexibility</button>
+            <button class="filter-btn" data-machine-filter="Free Weights">🏋️ Free Weights</button>
+            <button class="filter-btn" data-machine-filter="Other">📦 Other</button>
+          </div>
+          <button class="btn btn-primary" id="addMachineBtn">+ Add Machine</button>
+        </div>
+        <div class="machines-grid" id="machinesGrid">
+          <div class="empty-state full-empty"><span>🏋️</span><p>No machines added yet.</p></div>
+        </div>
+      </div>
+
+      <!-- BADMINTON SUB-TAB -->
+      <div class="subtab-panel" id="subtab-badminton">
+        <div class="filter-bar">
+          <div></div>
+          <button class="btn btn-primary" id="addBadmintonBtn">+ Log Session</button>
+        </div>
+        <div class="badminton-stats" id="badmintonStats"></div>
+        <div class="table-wrapper" style="margin-top:16px;">
+          <table class="data-table">
+            <thead><tr><th>Date</th><th>Duration (min)</th><th>Partner</th><th>Sets Won/Lost</th><th>Notes</th><th>Actions</th></tr></thead>
+            <tbody id="badmintonTbody">
+              <tr class="empty-row"><td colspan="6"><div class="empty-state"><span>🏸</span><p>No badminton sessions logged yet.</p></div></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- HISTORY SUB-TAB -->
+      <div class="subtab-panel" id="subtab-history">
+        <div class="filter-bar">
+          <div class="filter-group" id="historyFilterGroup">
+            <button class="filter-btn active" data-history-filter="all">All</button>
+            <button class="filter-btn" data-history-filter="gym">🏋️ Gym</button>
+            <button class="filter-btn" data-history-filter="badminton">🏸 Badminton</button>
+          </div>
+          <span id="historyStats" style="font-size:12px;color:var(--text-muted);"></span>
+        </div>
+        <div class="workout-history" id="workoutHistory">
+          <div class="empty-state full-empty"><span>🗂️</span><p>No workout history yet.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- BUDGET VIEW -->
+    <section class="view" id="view-budget">
+      <div class="page-header">
+        <h1>💰 Budget Tracker</h1>
+        <p class="page-sub">Keep your finances in check as a student.</p>
+      </div>
+      <div class="budget-overview">
+        <div class="budget-stat-card">
+          <div class="budget-label">Monthly Budget</div>
+          <div class="budget-value" id="budgetLimit">₹0.00</div>
+          <button class="btn btn-sm btn-outline" id="setBudgetBtn" style="margin-top:8px;">Set Budget</button>
+        </div>
+        <div class="budget-stat-card">
+          <div class="budget-label">Total Spent</div>
+          <div class="budget-value red" id="budgetSpent">₹0.00</div>
+        </div>
+        <div class="budget-stat-card">
+          <div class="budget-label">Remaining</div>
+          <div class="budget-value green" id="budgetRemaining">₹0.00</div>
+        </div>
+        <div class="budget-stat-card">
+          <div class="budget-label">This Month</div>
+          <div class="budget-progress-wrap">
+            <div class="budget-progress-fill" id="budgetProgressFill" style="width:0%"></div>
+          </div>
+          <div class="budget-pct" id="budgetPct">0% used</div>
+        </div>
+      </div>
+      <div class="filter-bar" style="margin-top:24px;">
+        <div class="filter-group" id="budgetFilterGroup">
+          <button class="filter-btn active" data-budget-filter="all">All</button>
+          <button class="filter-btn" data-budget-filter="Food">🍔 Food</button>
+          <button class="filter-btn" data-budget-filter="Study">📚 Study</button>
+          <button class="filter-btn" data-budget-filter="Transport">🚌 Transport</button>
+          <button class="filter-btn" data-budget-filter="Entertainment">🎮 Entertainment</button>
+          <button class="filter-btn" data-budget-filter="Other">📦 Other</button>
+        </div>
+        <button class="btn btn-primary" id="addExpenseBtn">+ Add Expense</button>
+      </div>
+      <div class="table-wrapper" style="margin-top:16px;">
+        <table class="data-table">
+          <thead><tr><th>Description</th><th>Category</th><th>Amount</th><th>Date</th><th>Actions</th></tr></thead>
+          <tbody id="budgetTbody">
+            <tr class="empty-row"><td colspan="5"><div class="empty-state"><span>💸</span><p>No expenses logged yet.</p></div></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- NOTES VIEW -->
+    <section class="view" id="view-notes">
+      <div class="page-header">
+        <h1>🗒️ Notes</h1>
+        <p class="page-sub">Quick notes, study reminders, and ideas.</p>
+      </div>
+      <div class="filter-bar">
+        <input type="text" class="search-bar" placeholder="Search notes..." id="notesSearch" />
+        <button class="btn btn-primary" id="addNoteBtn">+ New Note</button>
+      </div>
+      <div class="notes-grid" id="notesGrid">
+        <div class="empty-state full-empty"><span>📭</span><p>No notes yet. Create your first note!</p></div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- MODAL OVERLAY -->
+  <div class="modal-overlay" id="modalOverlay">
+    <div class="modal" id="modal">
+      <div class="modal-header">
+        <h3 id="modalTitle">Add Item</h3>
+        <button class="modal-close" id="modalClose">✕</button>
+      </div>
+      <div class="modal-body" id="modalBody"></div>
+    </div>
+  </div>
+
+  <!-- TOAST -->
+  <div class="toast" id="toast"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
