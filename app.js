@@ -569,7 +569,7 @@ function renderHabits() {
       if(checked)streak++;
       return `<td><div class="habit-check ${checked?'checked':''} ${future?'future':''}" ${future?'':'onclick="toggleHabitLog(\''+h.id+'\',\''+d+'\')"'}>${checked?'✓':''}</div></td>`;
     }).join('');
-    return `<tr><td class="habit-name-cell"><span style="font-size:16px;margin-right:6px">${h.emoji||'✅'}</span>${escHtml(h.name)}</td>${dayCells}<td class="habit-streak-cell">🔥 ${streak}</td><td><div class="habit-actions"><button class="icon-btn" onclick="deleteHabit('${h.id}')">🗑️</button></div></td></tr>`;
+    return `<tr><td class="habit-name-cell"><span style="font-size:16px;margin-right:6px">${h.emoji||'✅'}</span>${escHtml(h.name)}</td>${dayCells}<td class="habit-streak-cell">🔥 ${streak}</td><td><div class="habit-actions"><button class="icon-btn" onclick="editHabit('${h.id}')">✏️</button><button class="icon-btn" onclick="deleteHabit('${h.id}')">🗑️</button></div></td></tr>`;
   }).join('');
   container.innerHTML=`<table class="habit-table"><thead><tr><th style="text-align:left;padding-left:14px;">Habit</th>${dayHeaders}<th>Streak</th><th></th></tr></thead><tbody>${rows}</tbody></table>`;
 }
@@ -578,11 +578,58 @@ function deleteHabit(id) {
   Object.keys(STATE.habitLogs).filter(k=>k.startsWith(id+'_')).forEach(k=>delete STATE.habitLogs[k]);
   save(); renderHabits(); renderDashboard(); showToast('Removed','info');
 }
+function editHabit(id) {
+  const h = STATE.habits.find(x => x.id === id);
+  if (h) openModal('Edit Habit', buildHabitForm(h));
+}
 function buildHabitForm(h={}) {
-  const emojis=['✅','📚','💪','🧘','💧','🏃','🥗','😴','✍️','🎯','🧠','🎵','🌿','☀️','🚴'];
+  if (!STATE.customEmojis) STATE.customEmojis = ['✅','📚','💪','🧘','💧','🏃','🥗','😴','✍️','🎯','🧠','🎵','🌿','☀️','🚴','🍔','🚌','🎮','📦','🏋️','❤️','🏸','✈️','👗','🛒','💊','🎉','💸'];
+  
+  const emojiHtml = STATE.customEmojis.map((e,i)=>`<button type="button" style="font-size:20px;padding:4px;border-radius:6px;border:2px solid ${h.emoji===e?'var(--accent)':'transparent'};background:var(--bg-tertiary);cursor:pointer;" onclick="selectEmoji(this,'${e}')" oncontextmenu="removeHabitEmoji(${i}, '${h.id||''}'); return false;" data-emoji="${e}" title="Right-click to remove">${e}</button>`).join('');
+
   return `<div class="form-group"><label class="form-label">Habit Name *</label><input class="form-input" id="f_name" value="${escHtml(h.name||'')}" placeholder="e.g. Read for 30 mins"/></div>
-    <div class="form-group"><label class="form-label">Emoji</label><div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:4px;" id="emojiPicker">${emojis.map(e=>`<button type="button" style="font-size:20px;padding:4px;border-radius:6px;border:2px solid ${h.emoji===e?'var(--accent)':'transparent'};background:var(--bg-tertiary);cursor:pointer;" onclick="selectEmoji(this,'${e}')" data-emoji="${e}">${e}</button>`).join('')}</div><input type="hidden" id="f_emoji" value="${h.emoji||'✅'}"/></div>
-    <div class="form-actions"><button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="saveHabit('${h.id||''}')">Save</button></div>`;
+    <div class="form-group"><label class="form-label">Emoji</label>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;font-size:12px;color:var(--text-muted);">
+        <span>Select an emoji (Right-click to remove):</span>
+        <div style="display:flex;gap:4px;">
+          <input type="text" id="f_newHabitEmoji" placeholder="😀" style="width:36px;padding:2px;font-size:14px;border:1px solid var(--border);border-radius:4px;background:var(--bg-primary);color:var(--text-primary);text-align:center;" />
+          <button type="button" class="btn btn-sm btn-outline" style="padding:2px 8px;" onclick="addHabitEmoji('${h.id||''}')">+</button>
+        </div>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:4px;" id="emojiPicker">${emojiHtml}</div>
+      <input type="hidden" id="f_emoji" value="${h.emoji||'✅'}"/>
+    </div>
+    <div class="form-actions" style="justify-content: ${h.id ? 'space-between' : 'flex-end'}">
+      ${h.id ? `<button type="button" class="btn btn-danger" onclick="deleteHabit('${h.id}'); closeModal();">🗑️ Delete</button>` : ''}
+      <div style="display:flex;gap:8px;">
+        <button type="button" class="btn btn-outline" onclick="closeModal()">Cancel</button>
+        <button type="button" class="btn btn-primary" onclick="saveHabit('${h.id||''}')">Save</button>
+      </div>
+    </div>`;
+}
+
+function addHabitEmoji(hid) {
+  const input = document.getElementById('f_newHabitEmoji');
+  if (!input) return;
+  const val = input.value.trim();
+  if (val) {
+    if (!STATE.customEmojis) STATE.customEmojis = [];
+    if (!STATE.customEmojis.includes(val)) {
+      STATE.customEmojis.push(val);
+      save();
+    }
+    const h = { id: hid, name: document.getElementById('f_name').value, emoji: document.getElementById('f_emoji').value };
+    openModal(hid ? 'Edit Habit' : 'Add Habit', buildHabitForm(h));
+  }
+}
+
+function removeHabitEmoji(index, hid) {
+  if (STATE.customEmojis && STATE.customEmojis.length > index) {
+    STATE.customEmojis.splice(index, 1);
+    save();
+    const h = { id: hid, name: document.getElementById('f_name').value, emoji: document.getElementById('f_emoji').value };
+    openModal(hid ? 'Edit Habit' : 'Add Habit', buildHabitForm(h));
+  }
 }
 function selectEmoji(btn,emoji) {
   document.querySelectorAll('#emojiPicker button').forEach(b=>b.style.borderColor='transparent');
