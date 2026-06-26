@@ -88,6 +88,14 @@ function load() {
 
 function genId() { return `id_${Date.now()}_${Math.random().toString(36).slice(2,7)}`; }
 
+function categoryMatch(cat1, cat2) {
+  if (!cat1 || !cat2) return false;
+  if (cat1 === cat2) return true;
+  const c1 = String(cat1).toLowerCase();
+  const c2 = String(cat2).toLowerCase();
+  return c1.includes(c2) || c2.includes(c1);
+}
+
 // ==================== COLORS ====================
 const COURSE_COLORS = ['#7c5cbf','#4a90e2','#4caf7d','#f0965a','#e05c5c','#e8c44a','#20b2aa','#9b59b6'];
 function getCourseColor(name) {
@@ -419,6 +427,7 @@ let examFilter = 'all';
 function renderExams() {
   const externalGrid = document.getElementById('externalExamsGrid');
   const internalGrid = document.getElementById('internalExamsGrid');
+  const practicalGrid = document.getElementById('practicalExamsGrid');
   
   let exams = STATE.exams;
   if (examFilter==='upcoming') exams=exams.filter(e=>daysUntil(e.date)>=0);
@@ -426,9 +435,11 @@ function renderExams() {
   exams=exams.sort((a,b)=>a.date.localeCompare(b.date));
   
   const externals = exams.filter(e => e.type === 'external');
-  const internals = exams.filter(e => e.type !== 'external'); // Default to internal if unset
+  const practicals = exams.filter(e => e.type === 'practical');
+  const internals = exams.filter(e => e.type !== 'external' && e.type !== 'practical'); // Default to internal if unset
   
   const renderList = (list, grid, emptyMsg) => {
+    if (!grid) return;
     if (!list.length) { grid.innerHTML=`<div class="empty-state full-empty"><span>📭</span><p>${emptyMsg}</p></div>`; return; }
     grid.innerHTML=list.map(e=>{
       const days=daysUntil(e.date);
@@ -441,13 +452,14 @@ function renderExams() {
   
   renderList(externals, externalGrid, 'No external exams.');
   renderList(internals, internalGrid, 'No internal exams.');
+  renderList(practicals, practicalGrid, 'No practical exams.');
 }
 function deleteExam(id) { STATE.exams=STATE.exams.filter(e=>e.id!==id); save(); renderDashboard(); renderExams(); showToast('Deleted','info'); }
 function editExam(id) { const e=STATE.exams.find(x=>x.id===id); openModal('Edit Exam',buildExamForm(e),()=>saveExam(id)); }
 function buildExamForm(e={}) {
   const co=STATE.courses.map(c=>`<option value="${escHtml(c.name)}" ${e.course===c.name?'selected':''}>${escHtml(c.name)}</option>`).join('');
   return `<div class="form-row"><div class="form-group"><label class="form-label">Exam Name *</label><input class="form-input" id="f_name" value="${escHtml(e.name||'')}"/></div>
-    <div class="form-group"><label class="form-label">Exam Type</label><select class="form-select" id="f_type"><option value="internal" ${e.type==='internal'?'selected':''}>Internal (Mid Priority)</option><option value="external" ${e.type==='external'?'selected':''}>External (High Priority)</option></select></div></div>
+    <div class="form-group"><label class="form-label">Exam Type</label><select class="form-select" id="f_type"><option value="internal" ${e.type==='internal'?'selected':''}>Internal (Mid Priority)</option><option value="external" ${e.type==='external'?'selected':''}>External (High Priority)</option><option value="practical" ${e.type==='practical'?'selected':''}>Practical (Skill/Lab)</option></select></div></div>
     <div class="form-row"><div class="form-group"><label class="form-label">Course</label><select class="form-select" id="f_course"><option value="">No course</option>${co}</select></div><div class="form-group"><label class="form-label">Date *</label><input class="form-input" type="date" id="f_date" value="${e.date||''}"/></div></div>
     <div class="form-row"><div class="form-group"><label class="form-label">Time</label><input class="form-input" type="time" id="f_time" value="${e.time||''}"/></div><div class="form-group"><label class="form-label">Location</label><input class="form-input" id="f_location" value="${escHtml(e.location||'')}"/></div></div>
     <div class="form-actions"><button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="saveExam('${e.id||''}')">Save</button></div>`;
@@ -927,7 +939,7 @@ function renderMachines() {
   }
   const grid = document.getElementById('machinesGrid');
   let machines = STATE.workout.machines;
-  if (STATE.machineFilter !== 'all') machines = machines.filter(m => m.category === STATE.machineFilter);
+  if (STATE.machineFilter !== 'all') machines = machines.filter(m => categoryMatch(m.category, STATE.machineFilter));
   if (!machines.length) { grid.innerHTML = `<div class="empty-state full-empty"><span>🏋️</span><p>No machines found. Add one!</p></div>`; return; }
   const catColor = { Cardio:'var(--red)', Strength:'var(--blue)', Flexibility:'var(--teal)', 'Free Weights':'var(--orange)', Other:'var(--text-muted)' };
   grid.innerHTML = machines.map(m => `
@@ -1101,7 +1113,7 @@ function renderBudget() {
   document.getElementById('budgetProgressFill').style.width = `${pct}%`;
   document.getElementById('budgetPct').textContent = `${pct}% used`;
   let rows = expenses;
-  if (budgetFilter !== 'all') rows = rows.filter(e=>e.category===budgetFilter);
+  if (budgetFilter !== 'all') rows = rows.filter(e=>categoryMatch(e.category, budgetFilter));
   rows = rows.sort((a,b)=>b.date.localeCompare(a.date));
   const catEmoji = {Food:'🍔',Study:'📚',Transport:'🚌',Entertainment:'🎮',Other:'📦'};
   const tbody = document.getElementById('budgetTbody');
@@ -1226,6 +1238,7 @@ function openProfileModal() {
         <button class="btn btn-outline" style="flex:1" onclick="importData()">📥 Import Data</button>
       </div>
       <button class="btn btn-outline" style="width:100%; margin-top:8px;" onclick="openCategoriesModal()">🏷️ Manage Categories</button>
+      <button class="btn btn-outline" style="width:100%; margin-top:8px;" onclick="openModal('Add Course', buildCourseForm())">📚 Add Course</button>
     </div>
 
     <div class="divider"></div>
@@ -1262,12 +1275,20 @@ function logIn() {
 }
 
 function openCategoriesModal() {
-  const emojis = ['🍔','📚','🚌','🎮','📦','🏋️','❤️','💪','🧘','🏸','✈️','👗','🛒','💊','🎉','💸'];
-  const emojiHtml = emojis.map(e => `<button type="button" style="font-size:20px;padding:4px;border-radius:6px;border:none;background:transparent;cursor:pointer;" onclick="insertEmojiCategory('${e}')" title="Add ${e}">${e}</button>`).join('');
+  if (!STATE.customEmojis) {
+    STATE.customEmojis = ['🍔','📚','🚌','🎮','📦','🏋️','❤️','💪','🧘','🏸','✈️','👗','🛒','💊','🎉','💸'];
+  }
+  const emojiHtml = STATE.customEmojis.map((e, index) => `<button type="button" style="font-size:20px;padding:4px;border-radius:6px;border:none;background:transparent;cursor:pointer;" onclick="insertEmojiCategory('${e}')" title="Add ${e}" oncontextmenu="removeCustomEmoji(${index}); return false;">${e}</button>`).join('');
   
   const html = `
     <div style="margin-bottom:12px;display:flex;gap:4px;flex-wrap:wrap;background:var(--bg-tertiary);padding:8px;border-radius:8px;">
-      <div style="width:100%;font-size:12px;color:var(--text-muted);margin-bottom:4px;">Click an emoji to insert it into the active input:</div>
+      <div style="width:100%;font-size:12px;color:var(--text-muted);margin-bottom:4px;display:flex;justify-content:space-between;align-items:center;">
+        <span>Click to insert (Right-click to remove):</span>
+        <div style="display:flex;gap:4px;">
+          <input type="text" id="f_newEmoji" placeholder="😀" style="width:36px;padding:2px;font-size:14px;border:1px solid var(--border);border-radius:4px;background:var(--bg-primary);color:var(--text-primary);text-align:center;" />
+          <button type="button" class="btn btn-sm btn-outline" style="padding:2px 8px;" onclick="addCustomEmoji()">+</button>
+        </div>
+      </div>
       ${emojiHtml}
     </div>
     <div class="form-group">
@@ -1294,6 +1315,28 @@ function insertEmojiCategory(e) {
     input.value = input.value.substring(0, start) + e + input.value.substring(end);
     input.focus();
     input.selectionStart = input.selectionEnd = start + e.length;
+  }
+}
+
+window.addCustomEmoji = function() {
+  const input = document.getElementById('f_newEmoji');
+  if (!input) return;
+  const val = input.value.trim();
+  if (val) {
+    if (!STATE.customEmojis) STATE.customEmojis = [];
+    if (!STATE.customEmojis.includes(val)) {
+      STATE.customEmojis.push(val);
+      save();
+    }
+    openCategoriesModal();
+  }
+}
+
+window.removeCustomEmoji = function(index) {
+  if (STATE.customEmojis && STATE.customEmojis.length > index) {
+    STATE.customEmojis.splice(index, 1);
+    save();
+    openCategoriesModal();
   }
 }
 
