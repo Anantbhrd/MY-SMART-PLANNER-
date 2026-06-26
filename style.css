@@ -616,8 +616,10 @@ input, select, textarea { font-family: var(--font); }
 
 /* --- RESPONSIVE --- */
 @media (max-width: 768px) {
-  .sidebar { position: fixed; left: 0; top: 0; bottom: 0; z-index: 200; transform: translateX(-100%); }
+  .sidebar { position: fixed; left: 0; top: 0; bottom: 0; z-index: 200; transform: translateX(-100%); box-shadow: var(--shadow-lg); }
   .sidebar.mobile-open { transform: translateX(0); }
+  .sidebar-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 199; display: none; backdrop-filter: blur(2px); transition: opacity 0.3s; opacity: 0; }
+  .sidebar-overlay.show { display: block; opacity: 1; }
   .view { padding: 16px 14px 48px; }
   .stats-grid { grid-template-columns: 1fr 1fr; }
   .form-row, .form-row-3 { grid-template-columns: 1fr; }

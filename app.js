@@ -228,6 +228,13 @@ function navigate(view, e) {
     workout:'💪 Workout', budget:'💰 Budget Tracker', notes:'🗒️ Notes',
   };
   document.getElementById('topbarBreadcrumb').textContent = labels[view] || view;
+
+  // Auto-close sidebar on mobile
+  if (window.innerWidth <= 768) {
+    document.getElementById('sidebar')?.classList.remove('mobile-open');
+    document.getElementById('sidebarOverlay')?.classList.remove('show');
+  }
+
   renderView(view);
 }
 
@@ -1399,7 +1406,16 @@ function init() {
   document.getElementById('sidebarToggle').addEventListener('click',()=>document.getElementById('sidebar').classList.toggle('collapsed'));
   document.getElementById('menuBtn').addEventListener('click',()=>{
     const sb=document.getElementById('sidebar');
-    if (window.innerWidth<=768) sb.classList.toggle('mobile-open'); else sb.classList.toggle('collapsed');
+    if (window.innerWidth<=768) {
+      sb.classList.toggle('mobile-open');
+      document.getElementById('sidebarOverlay')?.classList.toggle('show');
+    } else sb.classList.toggle('collapsed');
+  });
+
+  // Sidebar overlay click
+  document.getElementById('sidebarOverlay')?.addEventListener('click', () => {
+    document.getElementById('sidebar')?.classList.remove('mobile-open');
+    document.getElementById('sidebarOverlay')?.classList.remove('show');
   });
 
   // Nav items
