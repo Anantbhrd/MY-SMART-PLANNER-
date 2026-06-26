@@ -9,6 +9,11 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="style.css" />
+
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
 </head>
 <body>
 
@@ -90,6 +95,10 @@
       <div class="topbar-breadcrumb" id="topbarBreadcrumb">🏠 Dashboard</div>
       <div class="topbar-actions">
         <span class="current-date" id="currentDate"></span>
+        <div class="user-badge" id="userBadge" style="display:none;" title="Click to sign out">
+          <img src="" id="userAvatar" alt="User" />
+          <span id="userName">User</span>
+        </div>
         <button class="btn btn-primary" id="topAddBtn">+ Add Item</button>
         <button class="theme-toggle" id="themeToggle" title="Toggle theme">🌙</button>
       </div>
@@ -509,6 +518,18 @@
 
   <!-- TOAST -->
   <div class="toast" id="toast"></div>
+
+  <!-- LOGIN OVERLAY -->
+  <div class="login-overlay" id="loginOverlay">
+    <div class="login-modal">
+      <div class="login-icon">🎓</div>
+      <h2>Student Planner</h2>
+      <p>Sign in to sync your data across all your devices.</p>
+      <button class="btn btn-primary" id="loginBtn" style="width: 100%; margin-top: 10px;">
+        <span style="font-size: 18px; margin-right: 8px;">G</span> Sign in with Google
+      </button>
+    </div>
+  </div>
 
   <script src="app.js"></script>
 </body>

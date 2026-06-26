@@ -32,15 +32,36 @@ const STATE = {
   historyFilter: 'all',
 };
 
+// ==================== FIREBASE CONFIG ====================
+const firebaseConfig = {
+  apiKey: "AIzaSyBV909j9ypRynF2ZO7BMXp90r6gPRfGUQk",
+  authDomain: "my-study-planner-98e4d.firebaseapp.com",
+  projectId: "my-study-planner-98e4d",
+  storageBucket: "my-study-planner-98e4d.firebasestorage.app",
+  messagingSenderId: "848797377236",
+  appId: "1:848797377236:web:7d641a2a083594a1bb5141",
+  measurementId: "G-BHB986PSP6"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+const auth = firebase.auth();
+const provider = new firebase.auth.GoogleAuthProvider();
+
+let currentUser = null;
+let unsubscribeSnapshot = null;
+
 // ==================== PERSISTENCE ====================
 function save() {
   try { localStorage.setItem('studentPlanner_v3', JSON.stringify(STATE)); } catch(e) {}
+  if (currentUser) {
+    db.collection('users').doc(currentUser.uid).set(STATE)
+      .catch(err => console.error("Firebase save error:", err));
+  }
 }
 function load() {
   try {
     const d = JSON.parse(localStorage.getItem('studentPlanner_v3'));
     if (d) {
-      // Deep merge workout sub-object
       if (d.workout) STATE.workout = Object.assign({}, STATE.workout, d.workout);
       if (d.semester) STATE.semester = Object.assign({}, STATE.semester, d.semester);
       Object.assign(STATE, d);
@@ -1073,6 +1094,74 @@ function escHtml(str) {
 }
 function capitalize(s) { return s ? s.charAt(0).toUpperCase()+s.slice(1) : ''; }
 
+// ==================== FIREBASE SYNC & AUTH ====================
+function renderAll() {
+  renderDashboard();
+  renderAssignments();
+  renderExams();
+  renderCourses();
+  renderPlanner();
+  renderHabits();
+  renderWorkoutToday();
+  renderWorkoutPlan();
+  renderMachines();
+  renderBadminton();
+  renderWorkoutHistory();
+  renderBudget();
+  renderNotes();
+  updateSemesterUI();
+  if (STATE.theme==='light') document.body.classList.add('light'); else document.body.classList.remove('light');
+}
+
+function initAuth() {
+  auth.onAuthStateChanged(user => {
+    if (user) {
+      currentUser = user;
+      document.getElementById('loginOverlay').style.display = 'none';
+      document.getElementById('userBadge').style.display = 'flex';
+      document.getElementById('userAvatar').src = user.photoURL || '';
+      document.getElementById('userName').textContent = user.displayName?.split(' ')[0] || 'User';
+      
+      if (unsubscribeSnapshot) unsubscribeSnapshot();
+      unsubscribeSnapshot = db.collection('users').doc(user.uid).onSnapshot(doc => {
+        if (doc.exists) {
+          const d = doc.data();
+          if (d.workout) STATE.workout = Object.assign({}, STATE.workout, d.workout);
+          if (d.semester) STATE.semester = Object.assign({}, STATE.semester, d.semester);
+          Object.assign(STATE, d);
+          STATE.workout = d.workout || STATE.workout;
+          STATE.semester = d.semester || STATE.semester;
+          localStorage.setItem('studentPlanner_v3', JSON.stringify(STATE));
+          renderAll();
+        } else {
+          save(); // Push local state up if new cloud doc
+          renderAll();
+        }
+      });
+    } else {
+      currentUser = null;
+      document.getElementById('loginOverlay').style.display = 'flex';
+      document.getElementById('userBadge').style.display = 'none';
+      if (unsubscribeSnapshot) unsubscribeSnapshot();
+      load();
+      renderAll();
+    }
+  });
+
+  document.getElementById('loginBtn')?.addEventListener('click', () => {
+    auth.signInWithPopup(provider).catch(err => {
+      console.error(err);
+      showToast("Login failed: " + err.message, 'error');
+    });
+  });
+
+  document.getElementById('userBadge')?.addEventListener('click', () => {
+    if (confirm("Sign out of Student Planner?")) {
+      auth.signOut();
+    }
+  });
+}
+
 // ==================== INIT ====================
 function init() {
   load();
@@ -1210,11 +1299,8 @@ function init() {
   document.getElementById('addNoteBtn').addEventListener('click',()=>openModal('New Note',buildNoteForm(),()=>saveNote('')));
   document.getElementById('notesSearch').addEventListener('input',e=>renderNotes(e.target.value));
 
-  // Initial render
-  renderDashboard();
-  renderPlanner();
-  renderHabits();
-  updateSemesterUI();
+  // Init Auth & Render
+  initAuth();
 }
 
 document.addEventListener('DOMContentLoaded', init);

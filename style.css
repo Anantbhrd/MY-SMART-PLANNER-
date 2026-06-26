@@ -598,6 +598,17 @@ input, select, textarea { font-family: var(--font); }
 .icon-btn:hover { background: var(--bg-hover); }
 .icon-btn.del:hover { background: var(--red-bg); }
 
+/* --- FIREBASE AUTH --- */
+.login-overlay { position: fixed; inset: 0; background: var(--bg-primary); z-index: 9999; display: flex; align-items: center; justify-content: center; }
+.login-modal { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-xl); padding: 40px; text-align: center; max-width: 400px; width: 90%; box-shadow: var(--shadow); }
+.login-icon { font-size: 48px; margin-bottom: 16px; }
+.login-modal h2 { font-size: 24px; font-weight: 800; margin-bottom: 8px; }
+.login-modal p { color: var(--text-muted); font-size: 14px; margin-bottom: 24px; }
+.user-badge { display: flex; align-items: center; gap: 8px; background: var(--bg-hover); padding: 4px 12px 4px 4px; border-radius: 99px; cursor: pointer; transition: var(--transition); border: 1px solid transparent; }
+.user-badge:hover { border-color: var(--border); background: var(--bg-tertiary); }
+.user-badge img { width: 24px; height: 24px; border-radius: 50%; object-fit: cover; }
+.user-badge span { font-size: 12px; font-weight: 600; color: var(--text-primary); }
+
 /* --- MISC --- */
 .color-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
 .overdue { color: var(--red) !important; }
