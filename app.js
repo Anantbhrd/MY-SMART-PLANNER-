@@ -920,6 +920,11 @@ function setActivePlan() {
 
 // ---- MACHINES ----
 function renderMachines() {
+  const mFilterGroup = document.getElementById('machineFilterGroup');
+  if (mFilterGroup) {
+    mFilterGroup.innerHTML = `<button class="filter-btn ${STATE.machineFilter==='all'?'active':''}" data-machine-filter="all">All</button>` +
+      STATE.categories.machines.map(c => `<button class="filter-btn ${STATE.machineFilter===c?'active':''}" data-machine-filter="${escHtml(c)}">${escHtml(c)}</button>`).join('');
+  }
   const grid = document.getElementById('machinesGrid');
   let machines = STATE.workout.machines;
   if (STATE.machineFilter !== 'all') machines = machines.filter(m => m.category === STATE.machineFilter);
@@ -1079,6 +1084,11 @@ function renderWorkoutHistory() {
 // ==================== BUDGET ====================
 let budgetFilter = 'all';
 function renderBudget() {
+  const bFilterGroup = document.getElementById('budgetFilterGroup');
+  if (bFilterGroup) {
+    bFilterGroup.innerHTML = `<button class="filter-btn ${budgetFilter==='all'?'active':''}" data-budget-filter="all">All</button>` +
+      STATE.categories.budget.map(c => `<button class="filter-btn ${budgetFilter===c?'active':''}" data-budget-filter="${escHtml(c)}">${escHtml(c)}</button>`).join('');
+  }
   const expenses = STATE.budget.expenses;
   const total = expenses.reduce((s,e)=>s+parseFloat(e.amount||0),0);
   const limit = parseFloat(STATE.budget.limit||0);
@@ -1096,7 +1106,11 @@ function renderBudget() {
   const catEmoji = {Food:'🍔',Study:'📚',Transport:'🚌',Entertainment:'🎮',Other:'📦'};
   const tbody = document.getElementById('budgetTbody');
   if (!rows.length) { tbody.innerHTML=`<tr class="empty-row"><td colspan="5"><div class="empty-state"><span>💸</span><p>No expenses found.</p></div></td></tr>`; return; }
-  tbody.innerHTML = rows.map(e=>`<tr><td>${escHtml(e.desc)}</td><td><span class="tag tag-in-progress">${catEmoji[e.category]||'📦'} ${escHtml(e.category)}</span></td><td><strong>₹${parseFloat(e.amount).toFixed(2)}</strong></td><td>${formatDate(e.date)}</td><td><button class="icon-btn del" onclick="deleteExpense('${e.id}')">🗑️</button></td></tr>`).join('');
+  tbody.innerHTML = rows.map(e=>{
+    let catText = escHtml(e.category);
+    let displayCat = catEmoji[e.category] ? `${catEmoji[e.category]} ${catText}` : catText;
+    return `<tr><td>${escHtml(e.desc)}</td><td><span class="tag tag-in-progress">${displayCat}</span></td><td><strong>₹${parseFloat(e.amount).toFixed(2)}</strong></td><td>${formatDate(e.date)}</td><td><button class="icon-btn del" onclick="deleteExpense('${e.id}')">🗑️</button></td></tr>`;
+  }).join('');
 }
 function deleteExpense(id) { STATE.budget.expenses=STATE.budget.expenses.filter(e=>e.id!==id); save(); renderBudget(); showToast('Removed','info'); }
 function buildExpenseForm() {
@@ -1248,14 +1262,21 @@ function logIn() {
 }
 
 function openCategoriesModal() {
+  const emojis = ['🍔','📚','🚌','🎮','📦','🏋️','❤️','💪','🧘','🏸','✈️','👗','🛒','💊','🎉','💸'];
+  const emojiHtml = emojis.map(e => `<button type="button" style="font-size:20px;padding:4px;border-radius:6px;border:none;background:transparent;cursor:pointer;" onclick="insertEmojiCategory('${e}')" title="Add ${e}">${e}</button>`).join('');
+  
   const html = `
+    <div style="margin-bottom:12px;display:flex;gap:4px;flex-wrap:wrap;background:var(--bg-tertiary);padding:8px;border-radius:8px;">
+      <div style="width:100%;font-size:12px;color:var(--text-muted);margin-bottom:4px;">Click an emoji to insert it into the active input:</div>
+      ${emojiHtml}
+    </div>
     <div class="form-group">
       <label class="form-label">Budget Categories (Comma separated)</label>
-      <input type="text" id="f_catBudget" class="form-input" value="${escHtml(STATE.categories.budget.join(', '))}" />
+      <input type="text" id="f_catBudget" class="form-input" value="${escHtml(STATE.categories.budget.join(', '))}" onfocus="window.lastFocusedCategoryInput = this" />
     </div>
     <div class="form-group" style="margin-top:12px;">
       <label class="form-label">Machine Categories (Comma separated)</label>
-      <input type="text" id="f_catMachines" class="form-input" value="${escHtml(STATE.categories.machines.join(', '))}" />
+      <input type="text" id="f_catMachines" class="form-input" value="${escHtml(STATE.categories.machines.join(', '))}" onfocus="window.lastFocusedCategoryInput = this" />
     </div>
     <div class="form-actions" style="margin-top:20px;">
       <button class="btn btn-outline" onclick="openProfileModal()">Back</button>
@@ -1263,6 +1284,17 @@ function openCategoriesModal() {
     </div>
   `;
   openModal('Manage Categories', html);
+}
+
+function insertEmojiCategory(e) {
+  const input = window.lastFocusedCategoryInput || document.getElementById('f_catBudget');
+  if (input) {
+    const start = input.selectionStart || input.value.length;
+    const end = input.selectionEnd || input.value.length;
+    input.value = input.value.substring(0, start) + e + input.value.substring(end);
+    input.focus();
+    input.selectionStart = input.selectionEnd = start + e.length;
+  }
 }
 
 function saveCategories() {
