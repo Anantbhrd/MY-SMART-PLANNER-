@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="style.css?v=2.1" />
 
   <!-- Firebase SDK -->
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
@@ -99,9 +99,9 @@
       <div class="topbar-breadcrumb" id="topbarBreadcrumb">🏠 Dashboard</div>
       <div class="topbar-actions">
         <span class="current-date" id="currentDate"></span>
-        <div class="user-badge" id="userBadge" style="display:none;" title="Click to sign out">
-          <img src="" id="userAvatar" alt="User" />
-          <span id="userName">User</span>
+        <div class="user-badge" id="userBadge" style="display:flex;" title="Profile Menu">
+          <img src="https://ui-avatars.com/api/?name=G&background=ff9800&color=fff" id="userAvatar" alt="User" />
+          <span id="userName">Guest</span>
         </div>
         <button class="btn btn-primary" id="topAddBtn">+ Add Item</button>
         <button class="theme-toggle" id="themeToggle" title="Toggle theme">🌙</button>
@@ -281,8 +281,19 @@
         </div>
         <button class="btn btn-primary" id="addExamBtn">+ Add Exam</button>
       </div>
-      <div class="exam-cards-grid" id="examCardsGrid">
-        <div class="empty-state full-empty"><span>📭</span><p>No exams added yet.</p></div>
+
+      <h3 style="margin-top: 10px; margin-bottom: 10px; color: var(--danger); display: flex; align-items: center; gap: 8px;">
+        🔴 External Exams <span style="font-size: 12px; background: var(--danger-alpha); padding: 2px 8px; border-radius: 12px; font-weight: normal;">High Priority</span>
+      </h3>
+      <div class="exam-cards-grid" id="externalExamsGrid" style="margin-bottom: 30px;">
+        <div class="empty-state full-empty"><span>📭</span><p>No external exams.</p></div>
+      </div>
+
+      <h3 style="margin-top: 10px; margin-bottom: 10px; color: var(--warning); display: flex; align-items: center; gap: 8px;">
+        🟠 Internal Exams <span style="font-size: 12px; background: var(--warning-alpha); padding: 2px 8px; border-radius: 12px; font-weight: normal; color: var(--warning)">Mid Priority</span>
+      </h3>
+      <div class="exam-cards-grid" id="internalExamsGrid">
+        <div class="empty-state full-empty"><span>📭</span><p>No internal exams.</p></div>
       </div>
     </section>
 
@@ -550,6 +561,6 @@
     </div>
   </div>
 
-  <script src="app.js"></script>
+  <script src="app.js?v=2.3"></script>
 </body>
 </html>

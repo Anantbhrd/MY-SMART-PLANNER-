@@ -262,9 +262,16 @@ function renderDashboard() {
   const futureExams = STATE.exams.filter(e => daysUntil(e.date) >= 0).sort((a,b) => new Date(a.date) - new Date(b.date));
   const nextExamBanner = document.getElementById('nextExamBanner');
   if (futureExams.length > 0) {
-    const nextExam = futureExams[0];
-    document.getElementById('nextExamName').textContent = nextExam.title;
+    let nextExam = futureExams[0];
+    // Prioritize external exam if it's within 14 days, even if an internal is sooner
+    const upcomingExternal = futureExams.find(e => e.type === 'external' && daysUntil(e.date) <= 14);
+    if (upcomingExternal) nextExam = upcomingExternal;
+
+    document.getElementById('nextExamName').textContent = nextExam.name || 'Exam';
     document.getElementById('nextExamDays').textContent = daysUntil(nextExam.date);
+    nextExamBanner.style.background = nextExam.type === 'external' 
+      ? 'linear-gradient(135deg, var(--danger) 0%, #ff4d4d 100%)' 
+      : 'linear-gradient(135deg, var(--warning) 0%, #ffb74d 100%)';
     nextExamBanner.style.display = 'flex';
   } else {
     nextExamBanner.style.display = 'none';
@@ -403,33 +410,45 @@ function saveAssignment(id = '') {
 // ==================== EXAMS ====================
 let examFilter = 'all';
 function renderExams() {
-  const grid = document.getElementById('examCardsGrid');
+  const externalGrid = document.getElementById('externalExamsGrid');
+  const internalGrid = document.getElementById('internalExamsGrid');
+  
   let exams = STATE.exams;
   if (examFilter==='upcoming') exams=exams.filter(e=>daysUntil(e.date)>=0);
   if (examFilter==='passed') exams=exams.filter(e=>daysUntil(e.date)<0);
   exams=exams.sort((a,b)=>a.date.localeCompare(b.date));
-  if (!exams.length) { grid.innerHTML=`<div class="empty-state full-empty"><span>📭</span><p>No exams found.</p></div>`; return; }
-  grid.innerHTML=exams.map(e=>{
-    const days=daysUntil(e.date);
-    const cc=days!=null?(days<=1?'urgent':days<=5?'soon':''):'';
-    const cl=days===null?'':days<0?'Passed':days===0?'Today!':String(days);
-    const sl=days>0?'days to go':'';
-    return `<div class="exam-card"><div class="exam-card-header"><div><div class="exam-card-name">${escHtml(e.name)}</div><div class="exam-card-course">${escHtml(e.course||'—')}</div></div></div><div><div class="exam-card-countdown ${cc}">${cl}</div><div class="exam-card-countdown-label">${sl}</div><div class="exam-card-date">📅 ${formatDate(e.date)}${e.time?` at ${e.time}`:''}</div>${e.location?`<div class="exam-card-date">📍 ${escHtml(e.location)}</div>`:''}</div><div class="exam-card-actions"><button class="btn btn-sm btn-outline" onclick="editExam('${e.id}')">✏️ Edit</button><button class="btn btn-sm btn-danger" onclick="deleteExam('${e.id}')">🗑️ Delete</button></div></div>`;
-  }).join('');
+  
+  const externals = exams.filter(e => e.type === 'external');
+  const internals = exams.filter(e => e.type !== 'external'); // Default to internal if unset
+  
+  const renderList = (list, grid, emptyMsg) => {
+    if (!list.length) { grid.innerHTML=`<div class="empty-state full-empty"><span>📭</span><p>${emptyMsg}</p></div>`; return; }
+    grid.innerHTML=list.map(e=>{
+      const days=daysUntil(e.date);
+      const cc=days!=null?(days<=1?'urgent':days<=5?'soon':''):'';
+      const cl=days===null?'':days<0?'Passed':days===0?'Today!':String(days);
+      const sl=days>0?'days to go':'';
+      return `<div class="exam-card"><div class="exam-card-header"><div><div class="exam-card-name">${escHtml(e.name)}</div><div class="exam-card-course">${escHtml(e.course||'—')}</div></div></div><div><div class="exam-card-countdown ${cc}">${cl}</div><div class="exam-card-countdown-label">${sl}</div><div class="exam-card-date">📅 ${formatDate(e.date)}${e.time?` at ${e.time}`:''}</div>${e.location?`<div class="exam-card-date">📍 ${escHtml(e.location)}</div>`:''}</div><div class="exam-card-actions"><button class="btn btn-sm btn-outline" onclick="editExam('${e.id}')">✏️ Edit</button><button class="btn btn-sm btn-danger" onclick="deleteExam('${e.id}')">🗑️ Delete</button></div></div>`;
+    }).join('');
+  };
+  
+  renderList(externals, externalGrid, 'No external exams.');
+  renderList(internals, internalGrid, 'No internal exams.');
 }
 function deleteExam(id) { STATE.exams=STATE.exams.filter(e=>e.id!==id); save(); renderDashboard(); renderExams(); showToast('Deleted','info'); }
 function editExam(id) { const e=STATE.exams.find(x=>x.id===id); openModal('Edit Exam',buildExamForm(e),()=>saveExam(id)); }
 function buildExamForm(e={}) {
   const co=STATE.courses.map(c=>`<option value="${escHtml(c.name)}" ${e.course===c.name?'selected':''}>${escHtml(c.name)}</option>`).join('');
-  return `<div class="form-group"><label class="form-label">Exam Name *</label><input class="form-input" id="f_name" value="${escHtml(e.name||'')}"/></div>
+  return `<div class="form-row"><div class="form-group"><label class="form-label">Exam Name *</label><input class="form-input" id="f_name" value="${escHtml(e.name||'')}"/></div>
+    <div class="form-group"><label class="form-label">Exam Type</label><select class="form-select" id="f_type"><option value="internal" ${e.type==='internal'?'selected':''}>Internal (Mid Priority)</option><option value="external" ${e.type==='external'?'selected':''}>External (High Priority)</option></select></div></div>
     <div class="form-row"><div class="form-group"><label class="form-label">Course</label><select class="form-select" id="f_course"><option value="">No course</option>${co}</select></div><div class="form-group"><label class="form-label">Date *</label><input class="form-input" type="date" id="f_date" value="${e.date||''}"/></div></div>
     <div class="form-row"><div class="form-group"><label class="form-label">Time</label><input class="form-input" type="time" id="f_time" value="${e.time||''}"/></div><div class="form-group"><label class="form-label">Location</label><input class="form-input" id="f_location" value="${escHtml(e.location||'')}"/></div></div>
     <div class="form-actions"><button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="saveExam('${e.id||''}')">Save</button></div>`;
 }
 function saveExam(id='') {
   const name=document.getElementById('f_name')?.value?.trim(), date=document.getElementById('f_date')?.value;
-  if (!name||!date) { showToast('Name & date required','error'); return; }
-  const data={id:id||genId(),name,course:document.getElementById('f_course')?.value||'',date,time:document.getElementById('f_time')?.value||'',location:document.getElementById('f_location')?.value||''};
+  if (!name||!date) { showToast('Name & Date required','error'); return; }
+  const data={id:id||genId(),name,type:document.getElementById('f_type')?.value||'internal',course:document.getElementById('f_course')?.value||'',date,time:document.getElementById('f_time')?.value||'',location:document.getElementById('f_location')?.value||''};
   if (id) { const idx=STATE.exams.findIndex(e=>e.id===id); if(idx>=0) STATE.exams[idx]=data; } else STATE.exams.push(data);
   save(); closeModal(); renderDashboard(); renderExams(); showToast(id?'Updated!':'Added!','success');
 }
@@ -1163,14 +1182,20 @@ function closeModal() { document.getElementById('modalOverlay').classList.remove
 // ==================== HELPERS ====================
 // ==================== PROFILE ====================
 function openProfileModal() {
+  const isGuest = !currentUser;
+  const authAction = isGuest 
+    ? `<button class="btn btn-primary" style="width:100%;" onclick="logIn()">Sign In</button>`
+    : `<button class="btn btn-danger" style="width:100%;" onclick="logOut()">Log Out</button>`;
+    
   const html = `
     <div class="form-group" style="margin-bottom:16px;">
       <label class="form-label">Profile Name</label>
-      <input type="text" id="f_profileName" class="form-input" value="${escHtml(currentUser?.displayName || 'User')}" />
+      <input type="text" id="f_profileName" class="form-input" value="${escHtml(currentUser?.displayName || 'Guest')}" ${isGuest ? 'disabled' : ''} />
     </div>
+    ${isGuest ? `<p style="font-size:12px;color:var(--text-muted);margin-bottom:16px;">You must sign in to change your profile name.</p>` : `
     <div class="form-actions" style="justify-content: flex-start; gap: 8px; margin-bottom: 24px;">
       <button class="btn btn-primary" onclick="saveProfile()">Save Changes</button>
-    </div>
+    </div>`}
     
     <div class="divider"></div>
     <div class="form-group" style="margin-top:16px; margin-bottom: 16px;">
@@ -1184,7 +1209,7 @@ function openProfileModal() {
 
     <div class="divider"></div>
     <div style="margin-top:16px;">
-      <button class="btn btn-danger" style="width:100%;" onclick="logOut()">Log Out</button>
+      ${authAction}
     </div>
   `;
   openModal('My Profile', html);
@@ -1208,6 +1233,11 @@ function logOut() {
     closeModal();
     auth.signOut();
   }
+}
+
+function logIn() {
+  closeModal();
+  document.getElementById('loginOverlay').style.display = 'flex';
 }
 
 function openCategoriesModal() {
@@ -1325,8 +1355,12 @@ function initAuth() {
       });
     } else {
       currentUser = null;
-      document.getElementById('loginOverlay').style.display = 'flex';
-      document.getElementById('userBadge').style.display = 'none';
+      if (!window.isOfflineMode) {
+        document.getElementById('loginOverlay').style.display = 'flex';
+      }
+      document.getElementById('userBadge').style.display = 'flex';
+      document.getElementById('userName').textContent = 'Guest';
+      document.getElementById('userAvatar').src = 'https://ui-avatars.com/api/?name=G&background=ff9800&color=fff';
       if (unsubscribeSnapshot) unsubscribeSnapshot();
       load();
       renderAll();
@@ -1340,11 +1374,8 @@ function initAuth() {
     });
   });
 
-  document.getElementById('userBadge')?.addEventListener('click', () => {
-    if (confirm("Sign out of Student Planner?")) {
-      auth.signOut();
-    }
-  });
+  // Open Profile Menu on badge click instead of direct logout
+  document.getElementById('userBadge')?.addEventListener('click', openProfileModal);
 }
 
 // ==================== INIT ====================
@@ -1488,6 +1519,7 @@ function init() {
   document.getElementById('exportDataBtn')?.addEventListener('click', exportData);
   document.getElementById('importDataBtn')?.addEventListener('click', importData);
   document.getElementById('offlineBtn')?.addEventListener('click', () => {
+    window.isOfflineMode = true; // Prevent auth listener from re-opening
     document.getElementById('loginOverlay').style.display = 'none';
   });
 
