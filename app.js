@@ -15,7 +15,11 @@ const STATE = {
   habitLogs: {},
   budget: { limit: 0, expenses: [] },
   notes: [],
-  semester: { startDate: '', endDate: '', name: 'Semester 1' },
+  categories: {
+    budget: ['Food', 'Study', 'Transport', 'Entertainment', 'Other'],
+    machines: ['Strength', 'Cardio', 'Flexibility', 'Free Weights', 'Other']
+  },
+  semester: { startDate: '', endDate: '', name: 'Semester 1', marksLastInternals: '', marksLastSemester: '' },
   workout: {
     machines: [],
     plans: [],
@@ -45,7 +49,16 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 const auth = firebase.auth();
+const storage = firebase.storage();
 const provider = new firebase.auth.GoogleAuthProvider();
+
+async function uploadFile(file) {
+  if (!currentUser) throw new Error("You must sign in to upload files.");
+  const safeName = file.name.replace(/[^a-zA-Z0-9.\-_]/g, '');
+  const ref = storage.ref(`user_uploads/${currentUser.uid}/${Date.now()}_${safeName}`);
+  await ref.put(file);
+  return await ref.getDownloadURL();
+}
 
 let currentUser = null;
 let unsubscribeSnapshot = null;
@@ -64,9 +77,11 @@ function load() {
     if (d) {
       if (d.workout) STATE.workout = Object.assign({}, STATE.workout, d.workout);
       if (d.semester) STATE.semester = Object.assign({}, STATE.semester, d.semester);
+      if (d.categories) STATE.categories = Object.assign({}, STATE.categories, d.categories);
       Object.assign(STATE, d);
       STATE.workout = d.workout || STATE.workout;
       STATE.semester = d.semester || STATE.semester;
+      STATE.categories = d.categories || STATE.categories;
     }
   } catch(e) {}
 }
@@ -243,6 +258,18 @@ function renderDashboard() {
   const habitPct = STATE.habits.length ? Math.round(habitsDone / STATE.habits.length * 100) : 0;
   document.getElementById('stat-habits').textContent = `${habitPct}%`;
 
+  // Next Exam Logic
+  const futureExams = STATE.exams.filter(e => daysUntil(e.date) >= 0).sort((a,b) => new Date(a.date) - new Date(b.date));
+  const nextExamBanner = document.getElementById('nextExamBanner');
+  if (futureExams.length > 0) {
+    const nextExam = futureExams[0];
+    document.getElementById('nextExamName').textContent = nextExam.title;
+    document.getElementById('nextExamDays').textContent = daysUntil(nextExam.date);
+    nextExamBanner.style.display = 'flex';
+  } else {
+    nextExamBanner.style.display = 'none';
+  }
+
   const pb = document.getElementById('badge-assignments');
   pb.textContent = pending > 0 ? pending : ''; pb.style.display = pending > 0 ? 'block' : 'none';
   const eb = document.getElementById('badge-exams');
@@ -414,23 +441,49 @@ function renderCourses() {
   grid.innerHTML=STATE.courses.map(c=>{
     const ta=STATE.assignments.filter(a=>a.course===c.name).length;
     const da=STATE.assignments.filter(a=>a.course===c.name&&a.status==='done').length;
-    return `<div class="course-card" style="border-top:3px solid ${c.color}"><div><div class="course-card-name">${escHtml(c.name)}</div><div class="course-card-code">${escHtml(c.code||'')}</div></div>${c.lecturer?`<div style="font-size:12px;color:var(--text-muted)">👨‍🏫 ${escHtml(c.lecturer)}</div>`:''}<div class="course-card-stats"><div class="course-stat"><div class="course-stat-val" style="color:${c.color}">${ta}</div><div class="course-stat-label">Tasks</div></div><div class="course-stat"><div class="course-stat-val" style="color:var(--green)">${da}</div><div class="course-stat-label">Done</div></div>${c.grade?`<div class="course-stat"><div class="course-stat-val">${escHtml(c.grade)}</div><div class="course-stat-label">Grade</div></div>`:''}</div><div class="course-card-actions"><button class="btn btn-sm btn-outline" onclick="editCourse('${c.id}')">✏️ Edit</button><button class="btn btn-sm btn-danger" onclick="deleteCourse('${c.id}')">🗑️ Delete</button></div></div>`;
+    return `<div class="course-card" style="border-top:3px solid ${c.color}">
+      <div class="course-code">${escHtml(c.code||'')}</div>
+      <div class="course-name">${escHtml(c.name)}</div>
+      <div class="course-prof">${escHtml(c.prof||'')}</div>
+      ${c.attachment ? `<div style="margin-top:8px;"><a href="${escHtml(c.attachment)}" target="_blank" style="font-size:12px; color:var(--accent);">🔗 View Material</a></div>` : ''}
+      <div class="course-card-stats"><div class="course-stat"><div class="course-stat-val" style="color:${c.color}">${ta}</div><div class="course-stat-label">Tasks</div></div><div class="course-stat"><div class="course-stat-val" style="color:var(--green)">${da}</div><div class="course-stat-label">Done</div></div>${c.grade?`<div class="course-stat"><div class="course-stat-val">${escHtml(c.grade)}</div><div class="course-stat-label">Grade</div></div>`:''}</div><div class="course-card-actions"><button class="btn btn-sm btn-outline" onclick="editCourse('${c.id}')">✏️ Edit</button><button class="btn btn-sm btn-danger" onclick="deleteCourse('${c.id}')">🗑️ Delete</button></div></div>`;
   }).join('');
 }
 function deleteCourse(id) { STATE.courses=STATE.courses.filter(c=>c.id!==id); save(); renderCourses(); showToast('Deleted','info'); }
-function editCourse(id) { const c=STATE.courses.find(x=>x.id===id); openModal('Edit Course',buildCourseForm(c),()=>saveCourse(id)); }
+function editCourse(id) { const c=STATE.courses.find(x=>x.id===id); openModal('Edit Course', buildCourseForm(c)); }
 function buildCourseForm(c={}) {
-  return `<div class="form-group"><label class="form-label">Course Name *</label><input class="form-input" id="f_name" value="${escHtml(c.name||'')}" placeholder="e.g. Mathematics"/></div>
-    <div class="form-row"><div class="form-group"><label class="form-label">Course Code</label><input class="form-input" id="f_code" value="${escHtml(c.code||'')}"/></div><div class="form-group"><label class="form-label">Color</label><input class="form-input" type="color" id="f_color" value="${c.color||'#7c5cbf'}"/></div></div>
-    <div class="form-row"><div class="form-group"><label class="form-label">Lecturer</label><input class="form-input" id="f_lecturer" value="${escHtml(c.lecturer||'')}"/></div><div class="form-group"><label class="form-label">Grade</label><input class="form-input" id="f_grade" value="${escHtml(c.grade||'')}"/></div></div>
-    <div class="form-actions"><button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="saveCourse('${c.id||''}')">Save</button></div>`;
+  const attHtml = c.attachment ? `<div style="margin-top:8px;"><a href="${escHtml(c.attachment)}" target="_blank" style="font-size:12px; color:var(--accent);">🔗 View current attachment</a></div>` : '';
+  return `
+    <div class="form-group"><label class="form-label">Course Code</label><input type="text" id="f_courseCode" class="form-input" value="${escHtml(c.code||'')}" placeholder="e.g. CS101"/></div>
+    <div class="form-group"><label class="form-label">Course Name</label><input type="text" id="f_courseName" class="form-input" value="${escHtml(c.name||'')}" placeholder="e.g. Intro to Computer Science"/></div>
+    <div class="form-group"><label class="form-label">Professor/Instructor</label><input type="text" id="f_courseProf" class="form-input" value="${escHtml(c.prof||'')}" placeholder="e.g. Dr. Smith"/></div>
+    <div class="form-group"><label class="form-label">Color</label><input type="color" id="f_courseColor" class="form-input" value="${c.color||'#3b82f6'}" style="height:40px;padding:2px;"/></div>
+    <div class="form-group">
+      <label class="form-label">Course Syllabus / Material (PDF)</label>
+      <input type="file" id="f_courseFile" accept=".pdf,.ppt,.pptx" class="form-input" style="padding: 6px;" />
+      ${attHtml}
+    </div>
+    <div class="form-actions"><button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-primary" id="saveCourseBtn" onclick="handleSaveCourse('${c.id||''}')">Save Course</button></div>`;
 }
-function saveCourse(id='') {
-  const name=document.getElementById('f_name')?.value?.trim();
-  if (!name) { showToast('Name required','error'); return; }
-  const data={id:id||genId(),name,code:document.getElementById('f_code')?.value||'',color:document.getElementById('f_color')?.value||COURSE_COLORS[STATE.courses.length%COURSE_COLORS.length],lecturer:document.getElementById('f_lecturer')?.value||'',grade:document.getElementById('f_grade')?.value||''};
-  if (id) { const idx=STATE.courses.findIndex(c=>c.id===id); if(idx>=0) STATE.courses[idx]=data; } else STATE.courses.push(data);
-  save(); closeModal(); renderCourses(); showToast(id?'Updated!':'Added!','success');
+async function handleSaveCourse(id) {
+  const btn = document.getElementById('saveCourseBtn');
+  btn.disabled = true; btn.textContent = "Saving...";
+  try {
+    const fileInput = document.getElementById('f_courseFile');
+    let attachment = null;
+    if (fileInput && fileInput.files.length > 0) attachment = await uploadFile(fileInput.files[0]);
+    
+    const code=document.getElementById('f_courseCode')?.value||'';
+    const name=document.getElementById('f_courseName')?.value||'';
+    const prof=document.getElementById('f_courseProf')?.value||'';
+    const color=document.getElementById('f_courseColor')?.value||'#3b82f6';
+    if (!id) STATE.courses.push({ id: genId(), code, name, prof, color, attachment });
+    else { const c=STATE.courses.find(x=>x.id===id); if(c) { c.code=code; c.name=name; c.prof=prof; c.color=color; if(attachment) c.attachment=attachment; } }
+    save(); renderCourses(); closeModal(); showToast('Course saved','success');
+  } catch(e) {
+    showToast('Failed: ' + e.message, 'error');
+    btn.disabled = false; btn.textContent = "Save Course";
+  }
 }
 
 // ==================== WEEKLY PLANNER ====================
@@ -856,24 +909,17 @@ function renderMachines() {
         <button class="btn btn-sm btn-outline" onclick="editMachine('${m.id}')">✏️ Edit</button>
         <button class="btn btn-sm btn-danger" onclick="deleteMachine('${m.id}')">🗑️</button>
       </div>
-    </div>
-  `).join('');
+    </div>`).join('');
 }
-
 function deleteMachine(id) { STATE.workout.machines=STATE.workout.machines.filter(m=>m.id!==id); save(); renderMachines(); showToast('Removed','info'); }
-function editMachine(id) { const m=STATE.workout.machines.find(x=>x.id===id); openModal('Edit Machine',buildMachineForm(m),()=>saveMachine(id)); }
+function editMachine(id) { const m=STATE.workout.machines.find(x=>x.id===id); openModal('Edit Machine',buildMachineForm(m)); }
 function buildMachineForm(m={}) {
+  const catOpts = STATE.categories.machines.map(c => `<option value="${escHtml(c)}" ${m.category===c?'selected':''}>${escHtml(c)}</option>`).join('');
   return `
     <div class="form-group"><label class="form-label">Machine / Exercise Name *</label><input class="form-input" id="f_machineName" value="${escHtml(m.name||'')}" placeholder="e.g. Treadmill, Bench Press, Pull-ups"/></div>
     <div class="form-row">
       <div class="form-group"><label class="form-label">Category</label>
-        <select class="form-select" id="f_machCat">
-          <option value="Strength" ${m.category==='Strength'?'selected':''}>💪 Strength</option>
-          <option value="Cardio" ${m.category==='Cardio'?'selected':''}>❤️ Cardio</option>
-          <option value="Flexibility" ${m.category==='Flexibility'?'selected':''}>🧘 Flexibility</option>
-          <option value="Free Weights" ${m.category==='Free Weights'?'selected':''}>🏋️ Free Weights</option>
-          <option value="Other" ${m.category==='Other'?'selected':''}>📦 Other</option>
-        </select>
+        <select class="form-select" id="f_machCat">${catOpts}</select>
       </div>
       <div class="form-group"><label class="form-label">Muscles Targeted</label><input class="form-input" id="f_muscles" value="${escHtml(m.muscles||'')}" placeholder="e.g. Chest, Biceps"/></div>
     </div>
@@ -1028,11 +1074,12 @@ function renderBudget() {
 }
 function deleteExpense(id) { STATE.budget.expenses=STATE.budget.expenses.filter(e=>e.id!==id); save(); renderBudget(); showToast('Removed','info'); }
 function buildExpenseForm() {
+  const catOpts = STATE.categories.budget.map(c => `<option value="${escHtml(c)}">${escHtml(c)}</option>`).join('');
   return `
     <div class="form-group"><label class="form-label">Description *</label><input class="form-input" id="f_desc" placeholder="What did you spend on?"/></div>
     <div class="form-row">
       <div class="form-group"><label class="form-label">Amount (₹) *</label><input class="form-input" type="number" step="0.01" min="0" id="f_amount" placeholder="0.00"/></div>
-      <div class="form-group"><label class="form-label">Category</label><select class="form-select" id="f_cat"><option value="Food">🍔 Food</option><option value="Study">📚 Study</option><option value="Transport">🚌 Transport</option><option value="Entertainment">🎮 Entertainment</option><option value="Other">📦 Other</option></select></div>
+      <div class="form-group"><label class="form-label">Category</label><select class="form-select" id="f_cat">${catOpts}</select></div>
     </div>
     <div class="form-group"><label class="form-label">Date</label><input class="form-input" type="date" id="f_date" value="${today()}"/></div>
     <div class="form-actions"><button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="saveExpense()">Add Expense</button></div>`;
@@ -1062,21 +1109,47 @@ function renderNotes(search='') {
   const colors=['#7c5cbf22','#4a90e222','#4caf7d22','#f0965a22','#e8c44a22'];
   grid.innerHTML = !notes.length
     ? `<div class="empty-state full-empty"><span>📭</span><p>${search?'No matching notes.':'No notes yet.'}</p></div>`
-    : notes.map((n,i)=>`<div class="note-card" style="background:${colors[i%colors.length]}" onclick="openNote('${n.id}')"><div class="note-card-title">${escHtml(n.title||'Untitled')}</div><div class="note-card-preview">${escHtml(n.content)}</div><div class="note-card-footer"><span class="note-card-date">${formatDate(n.updatedAt?.split('T')[0])}</span><span class="note-card-del" onclick="event.stopPropagation();deleteNote('${n.id}')">🗑️</span></div></div>`).join('');
+    : notes.map((n,i)=>`<div class="note-card" style="background:${colors[i%colors.length]}" onclick="editNote('${n.id}')">
+      <div class="note-card-title">${escHtml(n.title||'Untitled')}</div>
+      <div style="font-size:12px; color:var(--text-muted); margin-bottom: 8px;">${formatDate(n.date)}</div>
+      <p style="white-space:pre-wrap; font-size:13px;">${escHtml(n.content)}</p>
+      ${n.attachment ? `<div style="margin-top:12px;"><a href="${escHtml(n.attachment)}" target="_blank" style="font-size:12px; color:var(--accent); background:var(--accent-alpha); padding:4px 8px; border-radius:4px; text-decoration:none;">🔗 View Attachment</a></div>` : ''}
+      <div class="note-card-footer"><span class="note-card-del" onclick="event.stopPropagation();deleteNote('${n.id}')">🗑️</span></div>
+    </div>`).join('');
 }
-function openNote(id) { const n=STATE.notes.find(x=>x.id===id); openModal('Edit Note',buildNoteForm(n),()=>saveNote(id)); }
+function deleteNote(id) { STATE.notes=STATE.notes.filter(x=>x.id!==id); save(); renderNotes(); showToast('Removed','info'); }
+function editNote(id) { const n=STATE.notes.find(x=>x.id===id); openModal('Edit Note', buildNoteForm(n)); }
 function buildNoteForm(n={}) {
-  return `<div class="form-group"><label class="form-label">Title</label><input class="form-input" id="f_title" value="${escHtml(n.title||'')}"/></div>
-    <div class="form-group"><label class="form-label">Content</label><textarea class="form-textarea" id="f_content" style="min-height:160px;">${escHtml(n.content||'')}</textarea></div>
-    <div class="form-actions"><button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="saveNote('${n.id||''}')">Save Note</button></div>`;
+  const attHtml = n.attachment ? `<div style="margin-top:8px;"><a href="${escHtml(n.attachment)}" target="_blank" style="font-size:12px; color:var(--accent);">🔗 View current attachment</a></div>` : '';
+  return `
+    <div class="form-group"><label class="form-label">Title</label><input class="form-input" id="f_noteTitle" value="${escHtml(n.title||'')}"/></div>
+    <div class="form-group"><label class="form-label">Content</label><textarea class="form-input" id="f_noteContent" rows="5">${escHtml(n.content||'')}</textarea></div>
+    <div class="form-group">
+      <label class="form-label">Attachment (PDF/PPT)</label>
+      <input type="file" id="f_noteFile" accept=".pdf,.ppt,.pptx" class="form-input" style="padding: 6px;" />
+      ${attHtml}
+    </div>
+    <div class="form-actions"><button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-primary" id="saveNoteBtn" onclick="handleSaveNote('${n.id||''}')">Save Note</button></div>`;
 }
-function saveNote(id='') {
-  const title=document.getElementById('f_title')?.value?.trim()||'Untitled', content=document.getElementById('f_content')?.value||'';
-  const data={id:id||genId(),title,content,updatedAt:new Date().toISOString(),createdAt:id?(STATE.notes.find(n=>n.id===id)?.createdAt||new Date().toISOString()):new Date().toISOString()};
-  if (id) { const idx=STATE.notes.findIndex(n=>n.id===id); if(idx>=0) STATE.notes[idx]=data; } else STATE.notes.push(data);
-  save(); closeModal(); renderNotes(); showToast('Saved!','success');
+async function handleSaveNote(id) {
+  const btn = document.getElementById('saveNoteBtn');
+  btn.disabled = true; btn.textContent = "Saving...";
+  try {
+    const fileInput = document.getElementById('f_noteFile');
+    let attachment = null;
+    if (fileInput && fileInput.files.length > 0) attachment = await uploadFile(fileInput.files[0]);
+    
+    const title=document.getElementById('f_noteTitle')?.value||'Untitled';
+    const content=document.getElementById('f_noteContent')?.value||'';
+    if (!id) STATE.notes.push({ id: genId(), title, content, attachment, date: today() });
+    else { const n=STATE.notes.find(x=>x.id===id); if(n) { n.title=title; n.content=content; if(attachment) n.attachment=attachment; } }
+    save(); renderNotes(); closeModal(); showToast('Note saved','success');
+  } catch(e) {
+    showToast('Failed: ' + e.message, 'error');
+    btn.disabled = false; btn.textContent = "Save Note";
+  }
 }
-function deleteNote(id) { STATE.notes=STATE.notes.filter(n=>n.id!==id); save(); renderNotes(); showToast('Deleted','info'); }
+
 
 // ==================== MODAL ====================
 function openModal(title, bodyHtml) {
@@ -1088,6 +1161,84 @@ function openModal(title, bodyHtml) {
 function closeModal() { document.getElementById('modalOverlay').classList.remove('open'); }
 
 // ==================== HELPERS ====================
+// ==================== PROFILE ====================
+function openProfileModal() {
+  const html = `
+    <div class="form-group" style="margin-bottom:16px;">
+      <label class="form-label">Profile Name</label>
+      <input type="text" id="f_profileName" class="form-input" value="${escHtml(currentUser?.displayName || 'User')}" />
+    </div>
+    <div class="form-actions" style="justify-content: flex-start; gap: 8px; margin-bottom: 24px;">
+      <button class="btn btn-primary" onclick="saveProfile()">Save Changes</button>
+    </div>
+    
+    <div class="divider"></div>
+    <div class="form-group" style="margin-top:16px; margin-bottom: 16px;">
+      <label class="form-label">Data Management</label>
+      <div style="display:flex;gap:8px;margin-top:4px;">
+        <button class="btn btn-outline" style="flex:1" onclick="exportData()">📤 Export Data</button>
+        <button class="btn btn-outline" style="flex:1" onclick="importData()">📥 Import Data</button>
+      </div>
+      <button class="btn btn-outline" style="width:100%; margin-top:8px;" onclick="openCategoriesModal()">🏷️ Manage Categories</button>
+    </div>
+
+    <div class="divider"></div>
+    <div style="margin-top:16px;">
+      <button class="btn btn-danger" style="width:100%;" onclick="logOut()">Log Out</button>
+    </div>
+  `;
+  openModal('My Profile', html);
+}
+
+function saveProfile() {
+  const newName = document.getElementById('f_profileName')?.value.trim();
+  if (newName && currentUser) {
+    currentUser.updateProfile({ displayName: newName }).then(() => {
+      document.getElementById('userName').textContent = newName;
+      showToast('Profile updated!', 'success');
+      closeModal();
+    }).catch(err => {
+      showToast('Failed to update profile: ' + err.message, 'error');
+    });
+  }
+}
+
+function logOut() {
+  if (confirm("Sign out of Student Planner?")) {
+    closeModal();
+    auth.signOut();
+  }
+}
+
+function openCategoriesModal() {
+  const html = `
+    <div class="form-group">
+      <label class="form-label">Budget Categories (Comma separated)</label>
+      <input type="text" id="f_catBudget" class="form-input" value="${escHtml(STATE.categories.budget.join(', '))}" />
+    </div>
+    <div class="form-group" style="margin-top:12px;">
+      <label class="form-label">Machine Categories (Comma separated)</label>
+      <input type="text" id="f_catMachines" class="form-input" value="${escHtml(STATE.categories.machines.join(', '))}" />
+    </div>
+    <div class="form-actions" style="margin-top:20px;">
+      <button class="btn btn-outline" onclick="openProfileModal()">Back</button>
+      <button class="btn btn-primary" onclick="saveCategories()">Save Categories</button>
+    </div>
+  `;
+  openModal('Manage Categories', html);
+}
+
+function saveCategories() {
+  const b = document.getElementById('f_catBudget')?.value.split(',').map(s=>s.trim()).filter(Boolean) || [];
+  const m = document.getElementById('f_catMachines')?.value.split(',').map(s=>s.trim()).filter(Boolean) || [];
+  STATE.categories.budget = b.length ? b : STATE.categories.budget;
+  STATE.categories.machines = m.length ? m : STATE.categories.machines;
+  save();
+  renderAll();
+  showToast('Categories saved!', 'success');
+  openProfileModal();
+}
+
 function escHtml(str) {
   if (!str) return '';
   return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
@@ -1111,9 +1262,11 @@ function importData() {
     if (d && typeof d === 'object') {
       if (d.workout) STATE.workout = Object.assign({}, STATE.workout, d.workout);
       if (d.semester) STATE.semester = Object.assign({}, STATE.semester, d.semester);
+      if (d.categories) STATE.categories = Object.assign({}, STATE.categories, d.categories);
       Object.assign(STATE, d);
       STATE.workout = d.workout || STATE.workout;
       STATE.semester = d.semester || STATE.semester;
+      STATE.categories = d.categories || STATE.categories;
       localStorage.setItem('studentPlanner_v3', JSON.stringify(STATE));
       save(); // Push to Firebase if logged in
       renderAll();
@@ -1158,9 +1311,11 @@ function initAuth() {
           const d = doc.data();
           if (d.workout) STATE.workout = Object.assign({}, STATE.workout, d.workout);
           if (d.semester) STATE.semester = Object.assign({}, STATE.semester, d.semester);
+          if (d.categories) STATE.categories = Object.assign({}, STATE.categories, d.categories);
           Object.assign(STATE, d);
           STATE.workout = d.workout || STATE.workout;
           STATE.semester = d.semester || STATE.semester;
+          STATE.categories = d.categories || STATE.categories;
           localStorage.setItem('studentPlanner_v3', JSON.stringify(STATE));
           renderAll();
         } else {
@@ -1336,8 +1491,46 @@ function init() {
     document.getElementById('loginOverlay').style.display = 'none';
   });
 
+  // Semester Stats Click
+  document.getElementById('semesterStatsCard')?.addEventListener('click', openSemesterStatsModal);
+
   // Init Auth & Render
   initAuth();
+}
+
+// ==================== SEMESTER STATS ====================
+function openSemesterStatsModal() {
+  const completedAssignments = STATE.assignments.filter(a => a.completed).length;
+  const totalAssignments = STATE.assignments.length;
+  const html = `
+    <div style="text-align: center; margin-bottom: 20px;">
+      <div style="font-size: 32px; font-weight: 700; color: var(--accent);">${completedAssignments} <span style="font-size:16px;color:var(--text-muted)">/ ${totalAssignments}</span></div>
+      <div style="font-size: 14px; color: var(--text-muted);">Assignments Completed</div>
+    </div>
+    
+    <div class="form-group">
+      <label class="form-label">Marks/Grade in Last Internals</label>
+      <input type="text" id="f_marksInternals" class="form-input" placeholder="e.g. 85% or A-" value="${escHtml(STATE.semester.marksLastInternals || '')}" />
+    </div>
+    
+    <div class="form-group" style="margin-top: 12px;">
+      <label class="form-label">Marks/Grade in Last Semester</label>
+      <input type="text" id="f_marksSemester" class="form-input" placeholder="e.g. 9.2 CGPA" value="${escHtml(STATE.semester.marksLastSemester || '')}" />
+    </div>
+
+    <div class="form-actions" style="margin-top: 24px;">
+      <button class="btn btn-primary" style="width: 100%;" onclick="saveSemesterStats()">Save Stats</button>
+    </div>
+  `;
+  openModal('Semester Statistics', html);
+}
+
+function saveSemesterStats() {
+  STATE.semester.marksLastInternals = document.getElementById('f_marksInternals')?.value || '';
+  STATE.semester.marksLastSemester = document.getElementById('f_marksSemester')?.value || '';
+  save();
+  showToast('Stats saved!', 'success');
+  closeModal();
 }
 
 document.addEventListener('DOMContentLoaded', init);

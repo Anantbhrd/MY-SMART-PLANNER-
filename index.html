@@ -14,6 +14,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-storage-compat.js"></script>
 </head>
 <body>
 
@@ -75,18 +76,17 @@
     </nav>
 
     <div class="sidebar-footer">
-      <div class="progress-label">
-        <span>Semester Progress</span>
-        <span id="semesterPct">—</span>
+      <div id="semesterStatsCard" style="cursor: pointer; padding: 6px; margin: -6px; border-radius: 6px; transition: background 0.2s;" onmouseover="this.style.background='var(--card-hover)'" onmouseout="this.style.background='transparent'" title="Click to view Semester Stats">
+        <div class="progress-label" style="margin-bottom: 4px;">
+          <span>Semester Progress</span>
+          <span id="semesterPct">—</span>
+        </div>
+        <div class="progress-bar-wrap">
+          <div class="progress-bar-fill" id="semesterProgress" style="width: 0%"></div>
+        </div>
+        <div id="semesterDates" style="font-size: 11px; margin-top: 4px; color: var(--text-muted); text-align: center;"></div>
       </div>
-      <div class="progress-bar-wrap">
-        <div class="progress-bar-fill" id="semesterProgress" style="width: 0%"></div>
-      </div>
-      <button class="btn btn-sm btn-outline" id="semesterSettingsBtn" style="width:100%;margin-top:10px;font-size:11px;">⚙️ Semester Settings</button>
-      <div style="display:flex;gap:4px;margin-top:6px;">
-        <button class="btn btn-sm btn-outline" id="exportDataBtn" style="flex:1;font-size:10px;" title="Copy all data to clipboard">📤 Export</button>
-        <button class="btn btn-sm btn-outline" id="importDataBtn" style="flex:1;font-size:10px;" title="Paste data from clipboard">📥 Import</button>
-      </div>
+      <button class="btn btn-sm btn-outline" id="semesterSettingsBtn" style="width:100%;margin-top:16px;font-size:11px;">⚙️ Semester Settings</button>
     </div>
   </aside>
 
@@ -113,6 +113,18 @@
       <div class="page-header">
         <h1>🏠 Dashboard</h1>
         <p class="page-sub">Welcome back! Here's your study overview.</p>
+      </div>
+
+      <!-- Next Exam Banner -->
+      <div id="nextExamBanner" style="display:none; background: linear-gradient(135deg, var(--danger) 0%, #ff4d4d 100%); color: white; border-radius: 8px; padding: 16px; margin-bottom: 20px; box-shadow: 0 4px 12px rgba(239, 68, 68, 0.2); align-items: center; justify-content: space-between;">
+        <div>
+          <div style="font-size: 12px; text-transform: uppercase; letter-spacing: 1px; opacity: 0.9;">Next Exam</div>
+          <div id="nextExamName" style="font-size: 20px; font-weight: 600; margin-top: 4px;">Physics Midterm</div>
+        </div>
+        <div style="text-align: right;">
+          <div id="nextExamDays" style="font-size: 32px; font-weight: 700; line-height: 1;">3</div>
+          <div style="font-size: 12px; opacity: 0.9;">Days Left</div>
+        </div>
       </div>
 
       <div class="stats-grid">
