@@ -1094,6 +1094,36 @@ function escHtml(str) {
 }
 function capitalize(s) { return s ? s.charAt(0).toUpperCase()+s.slice(1) : ''; }
 
+// ==================== DATA MIGRATION ====================
+function exportData() {
+  const data = localStorage.getItem('studentPlanner_v3') || JSON.stringify(STATE);
+  navigator.clipboard.writeText(data).then(() => {
+    showToast('Data copied to clipboard! Now open Vercel and click Import.', 'success');
+  }).catch(() => {
+    const res = prompt("Copy this data manually:", data);
+  });
+}
+function importData() {
+  const input = prompt("Paste your exported data here:");
+  if (!input) return;
+  try {
+    const d = JSON.parse(input);
+    if (d && typeof d === 'object') {
+      if (d.workout) STATE.workout = Object.assign({}, STATE.workout, d.workout);
+      if (d.semester) STATE.semester = Object.assign({}, STATE.semester, d.semester);
+      Object.assign(STATE, d);
+      STATE.workout = d.workout || STATE.workout;
+      STATE.semester = d.semester || STATE.semester;
+      localStorage.setItem('studentPlanner_v3', JSON.stringify(STATE));
+      save(); // Push to Firebase if logged in
+      renderAll();
+      showToast('Data imported successfully!', 'success');
+    }
+  } catch(e) {
+    showToast('Invalid data format', 'error');
+  }
+}
+
 // ==================== FIREBASE SYNC & AUTH ====================
 function renderAll() {
   renderDashboard();
@@ -1298,6 +1328,13 @@ function init() {
   // Notes
   document.getElementById('addNoteBtn').addEventListener('click',()=>openModal('New Note',buildNoteForm(),()=>saveNote('')));
   document.getElementById('notesSearch').addEventListener('input',e=>renderNotes(e.target.value));
+
+  // Export / Import
+  document.getElementById('exportDataBtn')?.addEventListener('click', exportData);
+  document.getElementById('importDataBtn')?.addEventListener('click', importData);
+  document.getElementById('offlineBtn')?.addEventListener('click', () => {
+    document.getElementById('loginOverlay').style.display = 'none';
+  });
 
   // Init Auth & Render
   initAuth();

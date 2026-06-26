@@ -83,6 +83,10 @@
         <div class="progress-bar-fill" id="semesterProgress" style="width: 0%"></div>
       </div>
       <button class="btn btn-sm btn-outline" id="semesterSettingsBtn" style="width:100%;margin-top:10px;font-size:11px;">⚙️ Semester Settings</button>
+      <div style="display:flex;gap:4px;margin-top:6px;">
+        <button class="btn btn-sm btn-outline" id="exportDataBtn" style="flex:1;font-size:10px;" title="Copy all data to clipboard">📤 Export</button>
+        <button class="btn btn-sm btn-outline" id="importDataBtn" style="flex:1;font-size:10px;" title="Paste data from clipboard">📥 Import</button>
+      </div>
     </div>
   </aside>
 
@@ -527,6 +531,9 @@
       <p>Sign in to sync your data across all your devices.</p>
       <button class="btn btn-primary" id="loginBtn" style="width: 100%; margin-top: 10px;">
         <span style="font-size: 18px; margin-right: 8px;">G</span> Sign in with Google
+      </button>
+      <button class="btn btn-outline" id="offlineBtn" style="width: 100%; margin-top: 10px;">
+        Continue Offline
       </button>
     </div>
   </div>
