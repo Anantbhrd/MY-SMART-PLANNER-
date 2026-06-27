@@ -268,11 +268,13 @@ function renderView(view) {
 function renderDashboard() {
   const td = today();
   const pending = STATE.assignments.filter(a => a.status !== 'done').length;
-  const done = (STATE.todos || []).filter(t => t.done).length;
+  const totalTodos = (STATE.todos || []).length;
+  const doneTodos = (STATE.todos || []).filter(t => t.done).length;
+  const todoPct = totalTodos ? Math.round((doneTodos / totalTodos) * 100) : 0;
   const upcomingExams = STATE.exams.filter(e => daysUntil(e.date) >= 0).length;
   document.getElementById('stat-pending').textContent = pending;
   document.getElementById('stat-exams').textContent = upcomingExams;
-  document.getElementById('stat-done').textContent = done;
+  document.getElementById('stat-done').textContent = `${todoPct}%`;
   const habitsDone = STATE.habits.filter(h => STATE.habitLogs[`${h.id}_${td}`]).length;
   const habitPct = STATE.habits.length ? Math.round(habitsDone / STATE.habits.length * 100) : 0;
   document.getElementById('stat-habits').textContent = `${habitPct}%`;
