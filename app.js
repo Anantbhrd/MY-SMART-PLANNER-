@@ -34,6 +34,8 @@ const STATE = {
   workoutSubTab: 'today',
   machineFilter: 'all',
   historyFilter: 'all',
+  todos: [],
+  todoNotificationInterval: 6
 };
 
 // ==================== FIREBASE CONFIG ====================
@@ -82,6 +84,8 @@ function load() {
       STATE.workout = d.workout || STATE.workout;
       STATE.semester = d.semester || STATE.semester;
       STATE.categories = d.categories || STATE.categories;
+      STATE.todos = d.todos || [];
+      if (d.todoNotificationInterval) STATE.todoNotificationInterval = d.todoNotificationInterval;
     }
   } catch(e) {}
 }
@@ -252,7 +256,7 @@ function renderView(view) {
     case 'assignments': renderAssignments(); break;
     case 'exams': renderExams(); break;
     case 'courses': renderCourses(); break;
-    case 'planner': renderPlanner(); break;
+    case 'planner': renderPlanner(); renderTodos(); break;
     case 'habits': renderHabits(); break;
     case 'workout': renderWorkout(); break;
     case 'budget': renderBudget(); break;
@@ -264,7 +268,7 @@ function renderView(view) {
 function renderDashboard() {
   const td = today();
   const pending = STATE.assignments.filter(a => a.status !== 'done').length;
-  const done = STATE.assignments.filter(a => a.status === 'done').length;
+  const done = (STATE.todos || []).filter(t => t.done).length;
   const upcomingExams = STATE.exams.filter(e => daysUntil(e.date) >= 0).length;
   document.getElementById('stat-pending').textContent = pending;
   document.getElementById('stat-exams').textContent = upcomingExams;
@@ -342,12 +346,21 @@ function renderDashboard() {
         return `<div class="exam-item"><div class="exam-info"><div class="exam-name">${escHtml(e.name)}</div><div class="exam-course">${escHtml(e.course||'')}</div></div><div class="exam-countdown ${days<=3?'soon':''}">${days===0?'Today!':days+'d'}</div></div>`;
       }).join('');
 
-  // Study sessions today
-  const sl = document.getElementById('studySessionList');
-  const todaySess = STATE.sessions.filter(s => s.date === td);
-  sl.innerHTML = todaySess.length === 0
-    ? `<div class="empty-state"><span>🌅</span><p>No sessions planned today.</p></div>`
-    : todaySess.map(s => `<div class="deadline-item"><div class="deadline-dot" style="background:${s.color||'#7c5cbf'}"></div><div class="dl-info"><div class="dl-title">${escHtml(s.title)}</div><div class="dl-course">${escHtml(s.subject||'')}</div></div><div class="dl-date">${escHtml(s.time||'')}</div></div>`).join('');
+  // Today's To-Dos
+  const tl = document.getElementById('dashboardTodoList');
+  if (tl) {
+    if (!STATE.todos || STATE.todos.length === 0) {
+      tl.innerHTML = `<div class="empty-state"><span>📝</span><p>No to-dos yet.</p></div>`;
+    } else {
+      tl.innerHTML = STATE.todos.map(t => `
+        <div class="exercise-row ${t.done ? 'done-row' : ''}" style="margin-bottom:8px;">
+          <div class="ex-name" style="${t.done ? 'text-decoration: line-through; color: var(--text-secondary);' : ''}">${escHtml(t.text)}</div>
+          <div style="flex-grow:1;"></div>
+          <div class="exercise-done-check ${t.done ? 'done' : ''}" onclick="toggleTodo('${t.id}')">${t.done ? '✓' : ''}</div>
+        </div>
+      `).join('');
+    }
+  }
 
   // Workout today
   const dws = document.getElementById('dashWorkoutSummary');
@@ -541,6 +554,78 @@ async function handleSaveCourse(id) {
   } catch(e) {
     showToast('Failed: ' + e.message, 'error');
     btn.disabled = false; btn.textContent = "Save Course";
+  }
+}
+// ==================== TO-DO LIST ====================
+function renderTodos() {
+  const list = document.getElementById('todoList');
+  if (!list) return;
+  if (!STATE.todos) STATE.todos = [];
+  list.innerHTML = STATE.todos.map(t => `
+    <div class="exercise-row ${t.done ? 'done-row' : ''}">
+      <div class="ex-name" style="${t.done ? 'text-decoration: line-through; color: var(--text-secondary);' : ''}">${escHtml(t.text)}</div>
+      <div style="flex-grow:1;"></div>
+      <div class="exercise-done-check ${t.done ? 'done' : ''}" onclick="toggleTodo('${t.id}')">${t.done ? '✓' : ''}</div>
+      <button class="btn btn-sm btn-danger" style="margin-left:12px; padding:4px 8px; font-size:14px;" onclick="deleteTodo('${t.id}')">🗑️</button>
+    </div>
+  `).join('');
+  if (STATE.todos.length === 0) {
+    list.innerHTML = '<div class="empty-state"><span>📝</span><p>No to-dos yet. Add one above!</p></div>';
+  }
+}
+
+function addTodo(text) {
+  text = text.trim();
+  if (!text) return;
+  if (!STATE.todos) STATE.todos = [];
+  STATE.todos.push({ id: genId(), text, done: false, dateCreated: new Date().toISOString() });
+  save();
+  renderTodos();
+  renderDashboard();
+}
+
+function toggleTodo(id) {
+  const todo = STATE.todos.find(t => t.id === id);
+  if (todo) {
+    todo.done = !todo.done;
+    save();
+    renderTodos();
+    renderDashboard();
+  }
+}
+
+function deleteTodo(id) {
+  STATE.todos = STATE.todos.filter(t => t.id !== id);
+  save();
+  renderTodos();
+  renderDashboard();
+}
+
+function checkTodoNotifications() {
+  if (!STATE.todos) return;
+  const pendingTodos = STATE.todos.filter(t => !t.done).length;
+  if (pendingTodos === 0) return;
+
+  const intervalMins = STATE.todoNotificationInterval || 360;
+  const intervalMs = intervalMins * 60 * 1000;
+  
+  const lastNotification = localStorage.getItem('lastTodoNotification');
+  const now = Date.now();
+  
+  if (!lastNotification || (now - parseInt(lastNotification) >= intervalMs)) {
+    const text = `You have ${pendingTodos} pending To-Do items left to complete!`;
+    document.getElementById('reminderModalText').textContent = text;
+    document.getElementById('reminderOverlay').classList.add('open');
+    const audio = document.getElementById('notificationSound');
+    if (audio) {
+      audio.volume = STATE.notificationVolume !== undefined ? STATE.notificationVolume : 1.0;
+      audio.currentTime = 0;
+      audio.play().catch(e => console.log('Audio play prevented', e));
+    }
+    
+    // Fallback to browser notification if tab is in background (optional, but requested windowed popup so we skip browser notifications for now to avoid double notifications if they don't work well anyway)
+    
+    localStorage.setItem('lastTodoNotification', now.toString());
   }
 }
 
@@ -1309,11 +1394,26 @@ function openProfileModal() {
     </div>
 
     <div class="divider"></div>
+    <div class="form-group" style="margin-top:16px; margin-bottom: 16px;">
+      <label class="form-label">Preferences</label>
+      <div style="display:flex; align-items:center; gap:12px; margin-top:8px;">
+        <span style="font-size:14px; color:var(--text-secondary);">Notification Volume:</span>
+        <input type="range" min="0" max="1" step="0.1" value="${STATE.notificationVolume !== undefined ? STATE.notificationVolume : 1.0}" 
+               oninput="updateNotificationVolume(this.value)" style="flex-grow:1; cursor:pointer;" />
+      </div>
+    </div>
+
+    <div class="divider"></div>
     <div style="margin-top:16px;">
       ${authAction}
     </div>
   `;
   openModal('My Profile', html);
+}
+
+function updateNotificationVolume(val) {
+  STATE.notificationVolume = parseFloat(val);
+  save();
 }
 
 function saveProfile() {
@@ -1630,6 +1730,73 @@ function init() {
   document.getElementById('prevWeek').addEventListener('click',()=>{STATE.weekOffset--; renderPlanner();});
   document.getElementById('nextWeek').addEventListener('click',()=>{STATE.weekOffset++; renderPlanner();});
   document.getElementById('addSessionBtn').addEventListener('click',()=>openModal('Add Session',buildSessionForm(),()=>saveSession('')));
+
+  // Planner Tabs
+  const plannerTabs = document.getElementById('plannerSubTabs');
+  if (plannerTabs) {
+    plannerTabs.addEventListener('click', e => {
+      const btn = e.target.closest('.sub-tab');
+      if (!btn) return;
+      plannerTabs.querySelectorAll('.sub-tab').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      const tabId = btn.dataset.subtab;
+      document.querySelectorAll('#view-planner .subtab-panel').forEach(p => p.classList.remove('active'));
+      const panel = document.getElementById(`subtab-${tabId}`);
+      if (panel) panel.classList.add('active');
+    });
+  }
+
+  // To-Do List
+  document.getElementById('addTodoBtn')?.addEventListener('click', () => {
+    const input = document.getElementById('todoInput');
+    addTodo(input.value);
+    input.value = '';
+  });
+  document.getElementById('todoInput')?.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') {
+      addTodo(e.target.value);
+      e.target.value = '';
+    }
+  });
+  const hrInput = document.getElementById('todoIntervalHours');
+  const minInput = document.getElementById('todoIntervalMins');
+  const saveIntervalBtn = document.getElementById('saveTodoIntervalBtn');
+  if (hrInput && minInput && saveIntervalBtn) {
+    const totalMins = STATE.todoNotificationInterval || 360; // default 6 hrs
+    hrInput.value = Math.floor(totalMins / 60);
+    minInput.value = totalMins % 60;
+    saveIntervalBtn.addEventListener('click', () => {
+      const h = parseInt(hrInput.value) || 0;
+      const m = parseInt(minInput.value) || 0;
+      if (h === 0 && m === 0) {
+        showToast('Interval must be > 0', 'error');
+        return;
+      }
+      STATE.todoNotificationInterval = (h * 60) + m;
+      save();
+      showToast(`Reminder set to ${h}h ${m}m`, 'success');
+    });
+  }
+
+  // To-Do Notifications logic
+  const testBtn = document.getElementById('testReminderBtn');
+  if (testBtn) {
+    testBtn.addEventListener('click', () => {
+      document.getElementById('reminderModalText').textContent = 'This is a test reminder!';
+      document.getElementById('reminderOverlay').classList.add('open');
+      const audio = document.getElementById('notificationSound');
+      if (audio) {
+        audio.volume = STATE.notificationVolume !== undefined ? STATE.notificationVolume : 1.0;
+        audio.currentTime = 0;
+        audio.play().catch(e => console.log('Audio play prevented', e));
+      }
+    });
+  }
+
+  setInterval(() => {
+    checkTodoNotifications();
+  }, 60000); // Check every minute
+  checkTodoNotifications(); // Check immediately on load
 
   // Habits
   document.getElementById('prevHabitMonth').addEventListener('click',()=>{STATE.habitMonthOffset--; renderHabits();});

@@ -199,11 +199,11 @@
       <div class="two-col" style="margin-top: 24px;">
         <div class="card">
           <div class="card-header">
-            <h2>📅 Today's Study Sessions</h2>
-            <button class="card-action" data-view="planner">Open planner →</button>
+            <h2>📝 Today's To-Do List</h2>
+            <button class="card-action" data-view="planner" onclick="document.querySelector('[data-subtab=\'planner-todo\']')?.click()">Open To-Dos →</button>
           </div>
-          <div id="studySessionList" class="deadline-list">
-            <div class="empty-state"><span>🌅</span><p>No sessions planned today.</p></div>
+          <div id="dashboardTodoList" class="exercise-list" style="margin-top: 12px;">
+            <div class="empty-state"><span>📝</span><p>No to-dos yet.</p></div>
           </div>
         </div>
 
@@ -328,16 +328,48 @@
     <section class="view" id="view-planner">
       <div class="page-header">
         <h1>🗓️ Weekly Planner</h1>
-        <p class="page-sub">Plan your week, session by session.</p>
+        <p class="page-sub">Plan your week and manage your to-dos.</p>
       </div>
-      <div class="week-nav">
-        <button class="btn btn-outline" id="prevWeek">← Prev</button>
-        <span class="week-label" id="weekLabel"></span>
-        <button class="btn btn-outline" id="nextWeek">Next →</button>
-        <button class="btn btn-primary" id="addSessionBtn">+ Add Session</button>
+
+      <div class="sub-tabs" id="plannerSubTabs">
+        <button class="sub-tab active" data-subtab="planner-weekly">🗓️ Weekly Planner</button>
+        <button class="sub-tab" data-subtab="planner-todo">📝 To-Do List</button>
       </div>
-      <div class="weekly-grid-scroll">
-        <div class="weekly-grid" id="weeklyGrid"></div>
+
+      <div class="subtab-panel active" id="subtab-planner-weekly">
+        <div class="week-nav">
+          <button class="btn btn-outline" id="prevWeek">← Prev</button>
+          <span class="week-label" id="weekLabel"></span>
+          <button class="btn btn-outline" id="nextWeek">Next →</button>
+          <button class="btn btn-primary" id="addSessionBtn">+ Add Session</button>
+        </div>
+        <div class="weekly-grid-scroll">
+          <div class="weekly-grid" id="weeklyGrid"></div>
+        </div>
+      </div>
+
+      <div class="subtab-panel" id="subtab-planner-todo">
+        <div class="card">
+          <div class="card-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+            <h2>📝 To-Do List</h2>
+            <div class="todo-notification-settings" style="display:flex; align-items:center; gap:8px; font-size:14px; color:var(--text-secondary);">
+              <label>Reminder:</label>
+              <input type="number" id="todoIntervalHours" class="form-input" min="0" max="999" placeholder="Hrs" style="width: 70px; display: inline-block; padding: 6px;" />
+              <span>h</span>
+              <input type="number" id="todoIntervalMins" class="form-input" min="0" max="59" placeholder="Min" style="width: 70px; display: inline-block; padding: 6px;" />
+              <span>m</span>
+              <button id="saveTodoIntervalBtn" class="btn btn-outline" style="padding: 6px 12px; font-size: 12px; margin-left: 8px;">Save</button>
+              <button id="testReminderBtn" class="btn btn-primary" style="padding: 6px 12px; font-size: 12px; margin-left: 8px;" title="Send a test notification">Test Reminder</button>
+            </div>
+          </div>
+          <div style="padding:16px;">
+            <div style="display:flex; gap:12px; margin-bottom:16px;">
+              <input type="text" id="todoInput" class="form-input" placeholder="What needs to be done?" />
+              <button class="btn btn-primary" id="addTodoBtn">Add To-Do</button>
+            </div>
+            <div class="exercise-list" id="todoList"></div>
+          </div>
+        </div>
       </div>
     </section>
 
@@ -554,6 +586,18 @@
       <div class="modal-body" id="modalBody"></div>
     </div>
   </div>
+
+  <!-- REMINDER OVERLAY -->
+  <div class="modal-overlay" id="reminderOverlay" style="z-index: 9999;">
+    <div class="modal" id="reminderModal" style="text-align: center; max-width: 400px;">
+      <div style="font-size: 48px; margin-bottom: 16px;">🔔</div>
+      <h2 style="margin-top:0;">Reminder!</h2>
+      <p id="reminderModalText" style="color: var(--text-secondary); margin-bottom: 24px;"></p>
+      <button class="btn btn-primary" onclick="document.getElementById('reminderOverlay').classList.remove('open')" style="width: 100%; font-size: 16px; padding: 12px;">Got it!</button>
+    </div>
+  </div>
+
+  <audio id="notificationSound" src="notification.mp3" preload="auto"></audio>
 
   <!-- TOAST -->
   <div class="toast" id="toast"></div>

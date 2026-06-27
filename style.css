@@ -627,3 +627,38 @@ input, select, textarea { font-family: var(--font); }
   .sub-tab { padding: 6px 10px; font-size: 12px; white-space: nowrap; flex-shrink: 0; }
   .topbar-actions .current-date { display: none; }
 }
+
+ 
+ / *   = = = = = = = = = = = = = = = = = = = =   T O - D O   L I S T   = = = = = = = = = = = = = = = = = = = =   * / 
+ . t o d o - s e c t i o n   { 
+     b a c k g r o u n d :   v a r ( - - c a r d - b g ) ; 
+     b o r d e r - r a d i u s :   1 2 p x ; 
+     p a d d i n g :   2 0 p x ; 
+     m a r g i n - b o t t o m :   2 4 p x ; 
+     b o x - s h a d o w :   v a r ( - - s h a d o w ) ; 
+ } 
+ . t o d o - h e a d e r   { 
+     d i s p l a y :   f l e x ; 
+     j u s t i f y - c o n t e n t :   s p a c e - b e t w e e n ; 
+     a l i g n - i t e m s :   c e n t e r ; 
+     m a r g i n - b o t t o m :   1 6 p x ; 
+ } 
+ . t o d o - h e a d e r   h 2   { 
+     f o n t - s i z e :   1 . 2 5 r e m ; 
+     f o n t - w e i g h t :   6 0 0 ; 
+     m a r g i n :   0 ; 
+/* ==================== TO-DO LIST ==================== */
+.todo-section { background: var(--card-bg); border-radius: 12px; padding: 20px; margin-bottom: 24px; box-shadow: var(--shadow); }
+.todo-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px; }
+.todo-header h2 { font-size: 1.25rem; font-weight: 600; margin: 0; }
+.todo-notification-settings { display: flex; align-items: center; gap: 10px; font-size: 14px; color: var(--text-secondary); flex-wrap: wrap; }
+.todo-input-group { display: flex; gap: 12px; margin-bottom: 16px; }
+.todo-list { list-style: none; padding: 0; margin: 0; }
+.todo-item { display: flex; align-items: center; padding: 12px; border-bottom: 1px solid var(--border-color); gap: 12px; transition: background 0.2s; }
+.todo-item:hover { background: rgba(255, 255, 255, 0.05); }
+.todo-item:last-child { border-bottom: none; }
+.todo-item input[type='checkbox'] { width: 20px; height: 20px; accent-color: var(--primary); cursor: pointer; }
+.todo-item .todo-text { flex-grow: 1; font-size: 1rem; }
+.todo-item.done .todo-text { text-decoration: line-through; color: var(--text-secondary); }
+.todo-item-delete { background: transparent; border: none; color: var(--danger); cursor: pointer; font-size: 1.2rem; opacity: 0.7; }
+.todo-item-delete:hover { opacity: 1; }
