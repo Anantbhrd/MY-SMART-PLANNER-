@@ -35,6 +35,7 @@ const STATE = {
   machineFilter: 'all',
   historyFilter: 'all',
   todos: [],
+  lastTodoResetDate: '',
   todoNotificationInterval: 6
 };
 
@@ -85,7 +86,9 @@ function load() {
       STATE.semester = d.semester || STATE.semester;
       STATE.categories = d.categories || STATE.categories;
       STATE.todos = d.todos || [];
+      if (d.lastTodoResetDate) STATE.lastTodoResetDate = d.lastTodoResetDate;
       if (d.todoNotificationInterval) STATE.todoNotificationInterval = d.todoNotificationInterval;
+      checkTodoReset();
     }
   } catch(e) {}
 }
@@ -629,6 +632,20 @@ function checkTodoNotifications() {
     
     localStorage.setItem('lastTodoNotification', now.toString());
   }
+}
+
+function checkTodoReset() {
+  const td = today();
+  if (STATE.lastTodoResetDate && STATE.lastTodoResetDate !== td) {
+    STATE.todos = STATE.todos.filter(t => !t.done);
+    STATE.lastTodoResetDate = td;
+    save();
+    return true;
+  } else if (!STATE.lastTodoResetDate) {
+    STATE.lastTodoResetDate = td;
+    save();
+  }
+  return false;
 }
 
 // ==================== WEEKLY PLANNER ====================
@@ -1797,6 +1814,10 @@ function init() {
 
   setInterval(() => {
     checkTodoNotifications();
+    if (checkTodoReset()) {
+      if (STATE.currentView === 'dashboard') renderDashboard();
+      if (STATE.currentView === 'planner') { renderTodos(); renderDashboard(); }
+    }
   }, 60000); // Check every minute
   checkTodoNotifications(); // Check immediately on load
 
