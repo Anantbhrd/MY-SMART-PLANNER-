@@ -679,6 +679,35 @@ function saveSession(id='') {
 }
 
 // ==================== HABITS ====================
+function calculateHabitStreak(habitId) {
+  let streak = 0;
+  let d = new Date();
+  const td = d.toISOString().split('T')[0];
+  
+  if (STATE.habitLogs[`${habitId}_${td}`]) {
+    streak++;
+  }
+  
+  d.setDate(d.getDate() - 1);
+  let yd = d.toISOString().split('T')[0];
+  
+  if (!STATE.habitLogs[`${habitId}_${td}`] && !STATE.habitLogs[`${habitId}_${yd}`]) {
+    return 0;
+  }
+  
+  while (true) {
+    let currStr = d.toISOString().split('T')[0];
+    if (STATE.habitLogs[`${habitId}_${currStr}`]) {
+      streak++;
+      d.setDate(d.getDate() - 1);
+    } else {
+      break;
+    }
+  }
+  
+  return streak;
+}
+
 function renderHabits() {
   const days=getMonthDays(STATE.habitMonthOffset);
   document.getElementById('habitMonthLabel').textContent=monthLabel(STATE.habitMonthOffset);
@@ -687,10 +716,9 @@ function renderHabits() {
   if (!STATE.habits.length) { container.innerHTML=`<div class="empty-state"><span>🌱</span><p>No habits added yet.</p></div>`; return; }
   const dayHeaders=days.map(d=>{const dt=new Date(d+'T00:00:00');const n=dt.getDate();const isT=d===td;return `<th style="${isT?'color:var(--accent-light);':''}">${n}</th>`;}).join('');
   const rows=STATE.habits.map(h=>{
-    let streak=0;
+    const streak = calculateHabitStreak(h.id);
     const dayCells=days.map(d=>{
       const key=`${h.id}_${d}`;const checked=!!STATE.habitLogs[key];const future=d>td;
-      if(checked)streak++;
       return `<td><div class="habit-check ${checked?'checked':''} ${future?'future':''}" ${future?'':'onclick="toggleHabitLog(\''+h.id+'\',\''+d+'\')"'}>${checked?'✓':''}</div></td>`;
     }).join('');
     return `<tr><td class="habit-name-cell"><span style="font-size:16px;margin-right:6px">${h.emoji||'✅'}</span>${escHtml(h.name)}</td>${dayCells}<td class="habit-streak-cell">🔥 ${streak}</td><td><div class="habit-actions"><button class="icon-btn" onclick="editHabit('${h.id}')">✏️</button><button class="icon-btn" onclick="deleteHabit('${h.id}')">🗑️</button></div></td></tr>`;
