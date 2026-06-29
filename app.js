@@ -417,20 +417,41 @@ function renderAssignments() {
   const prev = sel.value;
   sel.innerHTML = '<option value="">All Courses</option>' + STATE.courses.map(c => `<option value="${escHtml(c.name)}">${escHtml(c.name)}</option>`).join('');
   sel.value = prev;
-  let rows = STATE.assignments;
-  if (assignmentFilter !== 'all') rows = rows.filter(a => a.status === assignmentFilter);
-  if (assignmentCourseFilter) rows = rows.filter(a => a.course === assignmentCourseFilter);
-  rows = rows.sort((a,b) => (!a.dueDate?1:!b.dueDate?-1:a.dueDate.localeCompare(b.dueDate)));
+  let rows = [];
+  if (assignmentFilter === 'done') {
+    rows = [...(STATE.completedAssignments || [])].sort((a, b) => (b.completedAt || '').localeCompare(a.completedAt || ''));
+  } else {
+    rows = STATE.assignments;
+    if (assignmentFilter !== 'all') rows = rows.filter(a => a.status === assignmentFilter);
+    if (assignmentCourseFilter) rows = rows.filter(a => a.course === assignmentCourseFilter);
+    rows = rows.sort((a,b) => (!a.dueDate?1:!b.dueDate?-1:a.dueDate.localeCompare(b.dueDate)));
+  }
+
   const tbody = document.getElementById('assignmentTbody');
   if (!rows.length) { tbody.innerHTML = `<tr class="empty-row"><td colspan="6"><div class="empty-state"><span>📭</span><p>No assignments found.</p></div></td></tr>`; return; }
   tbody.innerHTML = rows.map(a => {
-    const days = daysUntil(a.dueDate);
-    const dueTxt = a.dueDate ? formatDate(a.dueDate) : '—';
-    const extra = days !== null ? (days < 0 ? `<span class="overdue">(${Math.abs(days)}d ago)</span>` : days === 0 ? '<span style="color:var(--orange)">(today)</span>' : '') : '';
-    const sc = {'not-started':'tag-not-started','in-progress':'tag-in-progress','done':'tag-done'}[a.status]||'tag-not-started';
     const pc = {'high':'tag-high','medium':'tag-medium','low':'tag-low'}[a.priority]||'tag-low';
     const color = getCourseColor(a.course);
-    return `<tr><td><span style="display:flex;align-items:center;gap:8px"><span class="color-dot" style="background:${color}"></span>${escHtml(a.title)}</span></td><td>${escHtml(a.course||'—')}</td><td>${dueTxt} ${extra}</td><td><span class="tag ${pc}">${capitalize(a.priority||'low')}</span></td><td><select class="filter-select" style="padding:2px 6px;font-size:11px;" onchange="changeAssignmentStatus('${a.id}',this.value)"><option value="not-started" ${a.status==='not-started'?'selected':''}>Not Started</option><option value="in-progress" ${a.status==='in-progress'?'selected':''}>In Progress</option><option value="done" ${a.status==='done'?'selected':''}>Done</option></select></td><td><div class="table-actions"><button class="icon-btn" onclick="editAssignment('${a.id}')">✏️</button><button class="icon-btn del" onclick="deleteAssignment('${a.id}')">🗑️</button></div></td></tr>`;
+    
+    if (assignmentFilter === 'done') {
+      const completedDate = a.completedAt ? formatDate(a.completedAt.split('T')[0]) : '—';
+      return `<tr>
+        <td><span style="display:flex;align-items:center;gap:8px"><span class="color-dot" style="background:${color}"></span>${escHtml(a.title)}</span></td>
+        <td>${escHtml(a.course||'—')}</td>
+        <td>${a.dueDate ? formatDate(a.dueDate) : '—'}</td>
+        <td><span class="tag ${pc}">${capitalize(a.priority||'low')}</span></td>
+        <td><span class="tag tag-done">✅ ${completedDate}</span></td>
+        <td><div class="table-actions">
+          <button class="icon-btn" onclick="restoreAssignment('${a.id}')" title="Restore">♻️</button>
+          <button class="icon-btn del" onclick="deleteCompletedAssignment('${a.id}')" title="Delete permanently">🗑️</button>
+        </div></td>
+      </tr>`;
+    } else {
+      const days = daysUntil(a.dueDate);
+      const dueTxt = a.dueDate ? formatDate(a.dueDate) : '—';
+      const extra = days !== null ? (days < 0 ? `<span class="overdue">(${Math.abs(days)}d ago)</span>` : days === 0 ? '<span style="color:var(--orange)">(today)</span>' : '') : '';
+      return `<tr><td><span style="display:flex;align-items:center;gap:8px"><span class="color-dot" style="background:${color}"></span>${escHtml(a.title)}</span></td><td>${escHtml(a.course||'—')}</td><td>${dueTxt} ${extra}</td><td><span class="tag ${pc}">${capitalize(a.priority||'low')}</span></td><td><select class="filter-select" style="padding:2px 6px;font-size:11px;" onchange="changeAssignmentStatus('${a.id}',this.value)"><option value="not-started" ${a.status==='not-started'?'selected':''}>Not Started</option><option value="in-progress" ${a.status==='in-progress'?'selected':''}>In Progress</option><option value="done" ${a.status==='done'?'selected':''}>Done</option></select></td><td><div class="table-actions"><button class="icon-btn" onclick="editAssignment('${a.id}')">✏️</button><button class="icon-btn del" onclick="deleteAssignment('${a.id}')">🗑️</button></div></td></tr>`;
+    }
   }).join('');
 }
 
@@ -498,6 +519,51 @@ function renderExams() {
   const internalGrid = document.getElementById('internalExamsGrid');
   const practicalGrid = document.getElementById('practicalExamsGrid');
   
+  if (examFilter === 'completed') {
+    const renderCompletedList = (list, grid, emptyMsg) => {
+      if (!grid) return;
+      if (!list.length) { grid.innerHTML=`<div class="empty-state full-empty"><span>📭</span><p>${emptyMsg}</p></div>`; return; }
+      const sorted = [...list].sort((a, b) => (b.completedAt || '').localeCompare(a.completedAt || ''));
+      grid.innerHTML = sorted.map(e => {
+        const typeEmoji = e.type === 'external' ? '🔴' : e.type === 'practical' ? '🧪' : '🟠';
+        const typeLabel = capitalize(e.type || 'internal');
+        const stars = e.rating ? '⭐'.repeat(e.rating) + '☆'.repeat(5 - e.rating) : 'No rating';
+        const completedDate = e.completedAt ? formatDate(e.completedAt.split('T')[0]) : '—';
+        return `<div class="exam-card completed-exam-card">
+          <div class="exam-card-header">
+            <div>
+              <div class="exam-card-name">${escHtml(e.name)}</div>
+              <div class="exam-card-course">${typeEmoji} ${typeLabel} • ${escHtml(e.course || '—')}</div>
+            </div>
+            <div class="tag tag-done" style="font-size:11px;">✅ Done</div>
+          </div>
+          <div style="padding:0 16px;">
+            <div style="font-size:12px; color:var(--text-muted); margin-bottom:8px;">📅 ${formatDate(e.date)} • Completed ${completedDate}</div>
+            <div style="margin-bottom:6px; font-size:13px;">${stars}</div>
+            ${e.review ? `<div style="background:var(--bg-tertiary); padding:10px; border-radius:8px; margin-bottom:8px; font-size:13px;">
+              <div style="font-weight:600; font-size:11px; color:var(--accent); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:4px;">📝 Review</div>
+              <div style="color:var(--text-secondary); white-space:pre-wrap;">${escHtml(e.review)}</div>
+            </div>` : ''}
+            ${e.improvement ? `<div style="background:var(--orange-bg); padding:10px; border-radius:8px; margin-bottom:8px; font-size:13px;">
+              <div style="font-weight:600; font-size:11px; color:var(--orange); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:4px;">🎯 Improvement Notes</div>
+              <div style="color:var(--text-secondary); white-space:pre-wrap;">${escHtml(e.improvement)}</div>
+            </div>` : ''}
+          </div>
+          <div class="exam-card-actions">
+            <button class="btn btn-sm btn-outline" onclick="restoreExam('${e.id}')">♻️ Restore</button>
+            <button class="btn btn-sm btn-danger" onclick="deleteCompletedExam('${e.id}')">🗑️ Delete</button>
+          </div>
+        </div>`;
+      }).join('');
+    };
+
+    const completed = STATE.completedExams || [];
+    renderCompletedList(completed.filter(e => e.type === 'external'), externalGrid, 'No completed external exams.');
+    renderCompletedList(completed.filter(e => e.type !== 'external' && e.type !== 'practical'), internalGrid, 'No completed internal exams.');
+    renderCompletedList(completed.filter(e => e.type === 'practical'), practicalGrid, 'No completed practical exams.');
+    return;
+  }
+
   let exams = STATE.exams;
   if (examFilter==='upcoming') exams=exams.filter(e=>daysUntil(e.date)>=0);
   if (examFilter==='passed') exams=exams.filter(e=>daysUntil(e.date)<0);
@@ -1529,86 +1595,6 @@ async function handleSaveNote(id) {
 }
 
 
-// ==================== COMPLETED MODAL ====================
-function openCompletedModal(type = 'assignments') {
-  if (!STATE.completedAssignments) STATE.completedAssignments = [];
-  if (!STATE.completedExams) STATE.completedExams = [];
-
-  let html = `<div class="sub-tabs" style="margin-bottom: 20px;">
-    <button class="sub-tab ${type === 'assignments' ? 'active' : ''}" onclick="openCompletedModal('assignments')">📝 Assignments</button>
-    <button class="sub-tab ${type === 'exams' ? 'active' : ''}" onclick="openCompletedModal('exams')">📋 Exams</button>
-  </div>`;
-
-  if (type === 'assignments') {
-    if (STATE.completedAssignments.length === 0) {
-      html += `<div class="empty-state full-empty"><span>📭</span><p>No completed assignments yet.</p></div>`;
-    } else {
-      const sorted = [...STATE.completedAssignments].sort((a, b) => (b.completedAt || '').localeCompare(a.completedAt || ''));
-      html += `<div class="table-wrapper" style="max-height: 60vh; overflow-y: auto;">
-        <table class="data-table">
-          <thead><tr><th>Title</th><th>Course</th><th>Completed</th><th>Actions</th></tr></thead>
-          <tbody>
-            ${sorted.map(a => {
-              const color = getCourseColor(a.course);
-              const completedDate = a.completedAt ? formatDate(a.completedAt.split('T')[0]) : '—';
-              return `<tr>
-                <td><span style="display:flex;align-items:center;gap:8px"><span class="color-dot" style="background:${color}"></span>${escHtml(a.title)}</span></td>
-                <td>${escHtml(a.course || '—')}</td>
-                <td><span class="tag tag-done">✅ ${completedDate}</span></td>
-                <td><div class="table-actions">
-                  <button class="icon-btn" onclick="restoreAssignment('${a.id}')" title="Restore">♻️</button>
-                  <button class="icon-btn del" onclick="deleteCompletedAssignment('${a.id}')" title="Delete permanently">🗑️</button>
-                </div></td>
-              </tr>`;
-            }).join('')}
-          </tbody>
-        </table>
-      </div>`;
-    }
-  } else {
-    if (STATE.completedExams.length === 0) {
-      html += `<div class="empty-state full-empty"><span>📭</span><p>No completed exams yet.</p></div>`;
-    } else {
-      const sorted = [...STATE.completedExams].sort((a, b) => (b.completedAt || '').localeCompare(a.completedAt || ''));
-      html += `<div class="exam-cards-grid" style="max-height: 60vh; overflow-y: auto;">
-        ${sorted.map(e => {
-          const typeEmoji = e.type === 'external' ? '🔴' : e.type === 'practical' ? '🧪' : '🟠';
-          const typeLabel = capitalize(e.type || 'internal');
-          const stars = e.rating ? '⭐'.repeat(e.rating) + '☆'.repeat(5 - e.rating) : 'No rating';
-          const completedDate = e.completedAt ? formatDate(e.completedAt.split('T')[0]) : '—';
-          return `<div class="exam-card completed-exam-card">
-            <div class="exam-card-header">
-              <div>
-                <div class="exam-card-name">${escHtml(e.name)}</div>
-                <div class="exam-card-course">${typeEmoji} ${typeLabel} • ${escHtml(e.course || '—')}</div>
-              </div>
-              <div class="tag tag-done" style="font-size:11px;">✅ Done</div>
-            </div>
-            <div style="padding:0 16px;">
-              <div style="font-size:12px; color:var(--text-muted); margin-bottom:8px;">📅 ${formatDate(e.date)} • Completed ${completedDate}</div>
-              <div style="margin-bottom:6px; font-size:13px;">${stars}</div>
-              ${e.review ? `<div style="background:var(--bg-tertiary); padding:10px; border-radius:8px; margin-bottom:8px; font-size:13px;">
-                <div style="font-weight:600; font-size:11px; color:var(--accent); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:4px;">📝 Review</div>
-                <div style="color:var(--text-secondary); white-space:pre-wrap;">${escHtml(e.review)}</div>
-              </div>` : ''}
-              ${e.improvement ? `<div style="background:var(--orange-bg); padding:10px; border-radius:8px; margin-bottom:8px; font-size:13px;">
-                <div style="font-weight:600; font-size:11px; color:var(--orange); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:4px;">🎯 Improvement Notes</div>
-                <div style="color:var(--text-secondary); white-space:pre-wrap;">${escHtml(e.improvement)}</div>
-              </div>` : ''}
-            </div>
-            <div class="exam-card-actions">
-              <button class="btn btn-sm btn-outline" onclick="restoreExam('${e.id}')">♻️ Restore</button>
-              <button class="btn btn-sm btn-danger" onclick="deleteCompletedExam('${e.id}')">🗑️ Delete</button>
-            </div>
-          </div>`;
-        }).join('')}
-      </div>`;
-    }
-  }
-
-  openModal('✅ Completed Archive', html);
-}
-
 function restoreAssignment(id) {
   const idx = STATE.completedAssignments.findIndex(a => a.id === id);
   if (idx >= 0) {
@@ -1616,14 +1602,14 @@ function restoreAssignment(id) {
     a.status = 'in-progress';
     delete a.completedAt;
     STATE.assignments.push(a);
-    save(); openCompletedModal('assignments'); renderAssignments(); renderDashboard();
+    save(); renderAssignments(); renderDashboard();
     showToast('Assignment restored!', 'success');
   }
 }
 
 function deleteCompletedAssignment(id) {
   STATE.completedAssignments = STATE.completedAssignments.filter(a => a.id !== id);
-  save(); openCompletedModal('assignments');
+  save(); renderAssignments();
   showToast('Permanently deleted', 'info');
 }
 
@@ -1633,14 +1619,14 @@ function restoreExam(id) {
     const e = STATE.completedExams.splice(idx, 1)[0];
     delete e.completedAt; delete e.review; delete e.improvement; delete e.rating;
     STATE.exams.push(e);
-    save(); openCompletedModal('exams'); renderExams(); renderDashboard();
+    save(); renderExams(); renderDashboard();
     showToast('Exam restored!', 'success');
   }
 }
 
 function deleteCompletedExam(id) {
   STATE.completedExams = STATE.completedExams.filter(e => e.id !== id);
-  save(); openCompletedModal('exams');
+  save(); renderExams();
   showToast('Permanently deleted', 'info');
 }
 
