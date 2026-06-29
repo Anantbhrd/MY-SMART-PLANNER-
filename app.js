@@ -1529,85 +1529,84 @@ async function handleSaveNote(id) {
 }
 
 
-// ==================== COMPLETED TAB ====================
-function renderCompleted() {
+// ==================== COMPLETED MODAL ====================
+function openCompletedModal(type = 'assignments') {
   if (!STATE.completedAssignments) STATE.completedAssignments = [];
   if (!STATE.completedExams) STATE.completedExams = [];
 
-  // Badge
-  const totalCompleted = STATE.completedAssignments.length + STATE.completedExams.length;
-  const cb = document.getElementById('badge-completed');
-  if (cb) {
-    cb.textContent = totalCompleted > 0 ? totalCompleted : '';
-    cb.style.display = totalCompleted > 0 ? 'block' : 'none';
-  }
+  let html = `<div class="sub-tabs" style="margin-bottom: 20px;">
+    <button class="sub-tab ${type === 'assignments' ? 'active' : ''}" onclick="openCompletedModal('assignments')">📝 Assignments</button>
+    <button class="sub-tab ${type === 'exams' ? 'active' : ''}" onclick="openCompletedModal('exams')">📋 Exams</button>
+  </div>`;
 
-  // Completed Assignments Table
-  const tbody = document.getElementById('completedAssignmentsTbody');
-  if (tbody) {
+  if (type === 'assignments') {
     if (STATE.completedAssignments.length === 0) {
-      tbody.innerHTML = `<tr class="empty-row"><td colspan="6"><div class="empty-state"><span>📭</span><p>No completed assignments yet. Complete assignments to see them here!</p></div></td></tr>`;
+      html += `<div class="empty-state full-empty"><span>📭</span><p>No completed assignments yet.</p></div>`;
     } else {
       const sorted = [...STATE.completedAssignments].sort((a, b) => (b.completedAt || '').localeCompare(a.completedAt || ''));
-      tbody.innerHTML = sorted.map(a => {
-        const pc = {'high':'tag-high','medium':'tag-medium','low':'tag-low'}[a.priority] || 'tag-low';
-        const color = getCourseColor(a.course);
-        const completedDate = a.completedAt ? formatDate(a.completedAt.split('T')[0]) : '—';
-        return `<tr>
-          <td><span style="display:flex;align-items:center;gap:8px"><span class="color-dot" style="background:${color}"></span>${escHtml(a.title)}</span></td>
-          <td>${escHtml(a.course || '—')}</td>
-          <td>${a.dueDate ? formatDate(a.dueDate) : '—'}</td>
-          <td><span class="tag ${pc}">${capitalize(a.priority || 'low')}</span></td>
-          <td><span class="tag tag-done">✅ ${completedDate}</span></td>
-          <td><div class="table-actions">
-            <button class="icon-btn" onclick="restoreAssignment('${a.id}')" title="Restore">♻️</button>
-            <button class="icon-btn del" onclick="deleteCompletedAssignment('${a.id}')" title="Delete permanently">🗑️</button>
-          </div></td>
-        </tr>`;
-      }).join('');
+      html += `<div class="table-wrapper" style="max-height: 60vh; overflow-y: auto;">
+        <table class="data-table">
+          <thead><tr><th>Title</th><th>Course</th><th>Completed</th><th>Actions</th></tr></thead>
+          <tbody>
+            ${sorted.map(a => {
+              const color = getCourseColor(a.course);
+              const completedDate = a.completedAt ? formatDate(a.completedAt.split('T')[0]) : '—';
+              return `<tr>
+                <td><span style="display:flex;align-items:center;gap:8px"><span class="color-dot" style="background:${color}"></span>${escHtml(a.title)}</span></td>
+                <td>${escHtml(a.course || '—')}</td>
+                <td><span class="tag tag-done">✅ ${completedDate}</span></td>
+                <td><div class="table-actions">
+                  <button class="icon-btn" onclick="restoreAssignment('${a.id}')" title="Restore">♻️</button>
+                  <button class="icon-btn del" onclick="deleteCompletedAssignment('${a.id}')" title="Delete permanently">🗑️</button>
+                </div></td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>`;
+    }
+  } else {
+    if (STATE.completedExams.length === 0) {
+      html += `<div class="empty-state full-empty"><span>📭</span><p>No completed exams yet.</p></div>`;
+    } else {
+      const sorted = [...STATE.completedExams].sort((a, b) => (b.completedAt || '').localeCompare(a.completedAt || ''));
+      html += `<div class="exam-cards-grid" style="max-height: 60vh; overflow-y: auto;">
+        ${sorted.map(e => {
+          const typeEmoji = e.type === 'external' ? '🔴' : e.type === 'practical' ? '🧪' : '🟠';
+          const typeLabel = capitalize(e.type || 'internal');
+          const stars = e.rating ? '⭐'.repeat(e.rating) + '☆'.repeat(5 - e.rating) : 'No rating';
+          const completedDate = e.completedAt ? formatDate(e.completedAt.split('T')[0]) : '—';
+          return `<div class="exam-card completed-exam-card">
+            <div class="exam-card-header">
+              <div>
+                <div class="exam-card-name">${escHtml(e.name)}</div>
+                <div class="exam-card-course">${typeEmoji} ${typeLabel} • ${escHtml(e.course || '—')}</div>
+              </div>
+              <div class="tag tag-done" style="font-size:11px;">✅ Done</div>
+            </div>
+            <div style="padding:0 16px;">
+              <div style="font-size:12px; color:var(--text-muted); margin-bottom:8px;">📅 ${formatDate(e.date)} • Completed ${completedDate}</div>
+              <div style="margin-bottom:6px; font-size:13px;">${stars}</div>
+              ${e.review ? `<div style="background:var(--bg-tertiary); padding:10px; border-radius:8px; margin-bottom:8px; font-size:13px;">
+                <div style="font-weight:600; font-size:11px; color:var(--accent); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:4px;">📝 Review</div>
+                <div style="color:var(--text-secondary); white-space:pre-wrap;">${escHtml(e.review)}</div>
+              </div>` : ''}
+              ${e.improvement ? `<div style="background:var(--orange-bg); padding:10px; border-radius:8px; margin-bottom:8px; font-size:13px;">
+                <div style="font-weight:600; font-size:11px; color:var(--orange); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:4px;">🎯 Improvement Notes</div>
+                <div style="color:var(--text-secondary); white-space:pre-wrap;">${escHtml(e.improvement)}</div>
+              </div>` : ''}
+            </div>
+            <div class="exam-card-actions">
+              <button class="btn btn-sm btn-outline" onclick="restoreExam('${e.id}')">♻️ Restore</button>
+              <button class="btn btn-sm btn-danger" onclick="deleteCompletedExam('${e.id}')">🗑️ Delete</button>
+            </div>
+          </div>`;
+        }).join('')}
+      </div>`;
     }
   }
 
-  // Completed Exams Grid
-  const grid = document.getElementById('completedExamsGrid');
-  if (grid) {
-    if (STATE.completedExams.length === 0) {
-      grid.innerHTML = `<div class="empty-state full-empty"><span>📭</span><p>No completed exams yet. Complete exams to see your review notes here!</p></div>`;
-    } else {
-      const sorted = [...STATE.completedExams].sort((a, b) => (b.completedAt || '').localeCompare(a.completedAt || ''));
-      grid.innerHTML = sorted.map(e => {
-        const typeEmoji = e.type === 'external' ? '🔴' : e.type === 'practical' ? '🧪' : '🟠';
-        const typeLabel = capitalize(e.type || 'internal');
-        const stars = e.rating ? '⭐'.repeat(e.rating) + '☆'.repeat(5 - e.rating) : 'No rating';
-        const completedDate = e.completedAt ? formatDate(e.completedAt.split('T')[0]) : '—';
-        return `<div class="exam-card completed-exam-card">
-          <div class="exam-card-header">
-            <div>
-              <div class="exam-card-name">${escHtml(e.name)}</div>
-              <div class="exam-card-course">${typeEmoji} ${typeLabel} • ${escHtml(e.course || '—')}</div>
-            </div>
-            <div class="tag tag-done" style="font-size:11px;">✅ Done</div>
-          </div>
-          <div style="padding:0 16px;">
-            <div style="font-size:12px; color:var(--text-muted); margin-bottom:8px;">📅 ${formatDate(e.date)} • Completed ${completedDate}</div>
-            <div style="margin-bottom:6px; font-size:13px;">${stars}</div>
-            ${e.review ? `<div style="background:var(--bg-tertiary); padding:10px; border-radius:8px; margin-bottom:8px; font-size:13px;">
-              <div style="font-weight:600; font-size:11px; color:var(--accent); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:4px;">📝 Review</div>
-              <div style="color:var(--text-secondary); white-space:pre-wrap;">${escHtml(e.review)}</div>
-            </div>` : ''}
-            ${e.improvement ? `<div style="background:var(--orange-bg); padding:10px; border-radius:8px; margin-bottom:8px; font-size:13px;">
-              <div style="font-weight:600; font-size:11px; color:var(--orange); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:4px;">🎯 Improvement Notes</div>
-              <div style="color:var(--text-secondary); white-space:pre-wrap;">${escHtml(e.improvement)}</div>
-            </div>` : ''}
-          </div>
-          <div class="exam-card-actions">
-            <button class="btn btn-sm btn-outline" onclick="restoreExam('${e.id}')">♻️ Restore</button>
-            <button class="btn btn-sm btn-danger" onclick="deleteCompletedExam('${e.id}')">🗑️ Delete</button>
-          </div>
-        </div>`;
-      }).join('');
-    }
-  }
+  openModal('✅ Completed Archive', html);
 }
 
 function restoreAssignment(id) {
@@ -1617,14 +1616,14 @@ function restoreAssignment(id) {
     a.status = 'in-progress';
     delete a.completedAt;
     STATE.assignments.push(a);
-    save(); renderCompleted(); renderAssignments(); renderDashboard();
+    save(); openCompletedModal('assignments'); renderAssignments(); renderDashboard();
     showToast('Assignment restored!', 'success');
   }
 }
 
 function deleteCompletedAssignment(id) {
   STATE.completedAssignments = STATE.completedAssignments.filter(a => a.id !== id);
-  save(); renderCompleted();
+  save(); openCompletedModal('assignments');
   showToast('Permanently deleted', 'info');
 }
 
@@ -1634,14 +1633,14 @@ function restoreExam(id) {
     const e = STATE.completedExams.splice(idx, 1)[0];
     delete e.completedAt; delete e.review; delete e.improvement; delete e.rating;
     STATE.exams.push(e);
-    save(); renderCompleted(); renderExams(); renderDashboard();
+    save(); openCompletedModal('exams'); renderExams(); renderDashboard();
     showToast('Exam restored!', 'success');
   }
 }
 
 function deleteCompletedExam(id) {
   STATE.completedExams = STATE.completedExams.filter(e => e.id !== id);
-  save(); renderCompleted();
+  save(); openCompletedModal('exams');
   showToast('Permanently deleted', 'info');
 }
 
@@ -2038,21 +2037,6 @@ function init() {
       btn.classList.add('active');
       const tabId = btn.dataset.subtab;
       document.querySelectorAll('#view-planner .subtab-panel').forEach(p => p.classList.remove('active'));
-      const panel = document.getElementById(`subtab-${tabId}`);
-      if (panel) panel.classList.add('active');
-    });
-  }
-
-  // Completed Tabs
-  const completedTabs = document.getElementById('completedSubTabs');
-  if (completedTabs) {
-    completedTabs.addEventListener('click', e => {
-      const btn = e.target.closest('.sub-tab');
-      if (!btn) return;
-      completedTabs.querySelectorAll('.sub-tab').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      const tabId = btn.dataset.subtab;
-      document.querySelectorAll('#view-completed .subtab-panel').forEach(p => p.classList.remove('active'));
       const panel = document.getElementById(`subtab-${tabId}`);
       if (panel) panel.classList.add('active');
     });

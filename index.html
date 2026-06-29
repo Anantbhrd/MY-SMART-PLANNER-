@@ -66,10 +66,6 @@
       <a href="#" class="nav-item" data-view="notes">
         <span class="nav-icon">🗒️</span> Notes
       </a>
-      <a href="#" class="nav-item" data-view="completed">
-        <span class="nav-icon">✅</span> Completed
-        <span class="nav-badge" id="badge-completed"></span>
-      </a>
 
       <div class="nav-section-label" style="margin-top: 20px;">QUICK ADD</div>
       <button class="nav-item-btn" id="quickAddAssignment">
@@ -266,6 +262,7 @@
         <div class="filter-group">
           <select class="filter-select" id="filterCourse"><option value="">All Courses</option></select>
           <button class="btn btn-primary" id="addAssignmentBtn">+ Add Assignment</button>
+          <button class="btn btn-outline" onclick="openCompletedModal('assignments')">✅ View Completed</button>
         </div>
       </div>
       <div class="table-wrapper">
@@ -580,36 +577,6 @@
       </div>
     </section>
 
-  <!-- COMPLETED VIEW -->
-    <section class="view" id="view-completed">
-      <div class="page-header">
-        <h1>✅ Completed</h1>
-        <p class="page-sub">Your archived assignments and exams with notes & feedback.</p>
-      </div>
-
-      <div class="sub-tabs" id="completedSubTabs">
-        <button class="sub-tab active" data-subtab="completed-assignments">📝 Assignments</button>
-        <button class="sub-tab" data-subtab="completed-exams">📋 Exams</button>
-      </div>
-
-      <div class="subtab-panel active" id="subtab-completed-assignments">
-        <div class="table-wrapper">
-          <table class="data-table">
-            <thead><tr><th>Title</th><th>Course</th><th>Due Date</th><th>Priority</th><th>Completed</th><th>Actions</th></tr></thead>
-            <tbody id="completedAssignmentsTbody">
-              <tr class="empty-row"><td colspan="6"><div class="empty-state"><span>📭</span><p>No completed assignments yet.</p></div></td></tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <div class="subtab-panel" id="subtab-completed-exams">
-        <div class="exam-cards-grid" id="completedExamsGrid">
-          <div class="empty-state full-empty"><span>📭</span><p>No completed exams yet.</p></div>
-        </div>
-      </div>
-    </section>
-
   </main>
 
   <!-- MODAL OVERLAY -->
@@ -623,21 +590,14 @@
     </div>
   </div>
 
-  <!-- REMINDER OVERLAY (Redesigned) -->
-  <div class="reminder-overlay" id="reminderOverlay">
-    <div class="reminder-popup">
-      <div class="reminder-glow"></div>
-      <button class="reminder-close-btn" onclick="document.getElementById('reminderOverlay').classList.remove('open')">&times;</button>
-      <div class="reminder-icon-ring">
-        <div class="reminder-icon">🔔</div>
-      </div>
-      <h2 class="reminder-title">Hey, Don't Forget!</h2>
-      <p class="reminder-text" id="reminderModalText"></p>
-      <div class="reminder-timestamp" id="reminderTimestamp"></div>
-      <button class="reminder-action-btn" onclick="document.getElementById('reminderOverlay').classList.remove('open')">
-        <span>Got it!</span>
-        <span class="reminder-btn-icon">→</span>
-      </button>
+  <!-- REMINDER OVERLAY -->
+  <div class="modal-overlay" id="reminderOverlay" style="z-index: 9999;">
+    <div class="modal" id="reminderModal" style="text-align: center; max-width: 400px; border-radius: 16px; padding: 32px 24px;">
+      <div style="font-size: 56px; margin-bottom: 12px; animation: shake 0.5s ease-in-out infinite alternate;">🔔</div>
+      <h2 style="margin-top:0; font-size: 22px;">Hey, Don't Forget!</h2>
+      <p id="reminderModalText" style="color: var(--text-secondary); margin-bottom: 16px; font-size: 15px;"></p>
+      <div id="reminderTimestamp" style="font-size: 12px; color: var(--accent); background: var(--accent-glow); padding: 4px 12px; border-radius: 12px; display: inline-block; margin-bottom: 24px; font-weight: 600;"></div>
+      <button class="btn btn-primary" onclick="document.getElementById('reminderOverlay').classList.remove('open')" style="width: 100%; font-size: 16px; padding: 12px; border-radius: 12px;">Got it!</button>
     </div>
   </div>
 
