@@ -35,6 +35,8 @@ const STATE = {
   machineFilter: 'all',
   historyFilter: 'all',
   todos: [],
+  completedExams: [],
+  completedAssignments: [],
   lastTodoResetDate: '',
   todoNotificationInterval: 6
 };
@@ -86,6 +88,8 @@ function load() {
       STATE.semester = d.semester || STATE.semester;
       STATE.categories = d.categories || STATE.categories;
       STATE.todos = d.todos || [];
+      STATE.completedExams = d.completedExams || [];
+      STATE.completedAssignments = d.completedAssignments || [];
       if (d.lastTodoResetDate) STATE.lastTodoResetDate = d.lastTodoResetDate;
       if (d.todoNotificationInterval) STATE.todoNotificationInterval = d.todoNotificationInterval;
       checkTodoReset();
@@ -282,20 +286,21 @@ function renderDashboard() {
   const habitPct = STATE.habits.length ? Math.round(habitsDone / STATE.habits.length * 100) : 0;
   document.getElementById('stat-habits').textContent = `${habitPct}%`;
 
-  // Next Exam Logic
+  // Next Exam Logic — show the absolute closest upcoming exam regardless of type
   const futureExams = STATE.exams.filter(e => daysUntil(e.date) >= 0).sort((a,b) => new Date(a.date) - new Date(b.date));
   const nextExamBanner = document.getElementById('nextExamBanner');
   if (futureExams.length > 0) {
-    let nextExam = futureExams[0];
-    // Prioritize external exam if it's within 14 days, even if an internal is sooner
-    const upcomingExternal = futureExams.find(e => e.type === 'external' && daysUntil(e.date) <= 14);
-    if (upcomingExternal) nextExam = upcomingExternal;
-
-    document.getElementById('nextExamName').textContent = nextExam.name || 'Exam';
+    const nextExam = futureExams[0];
+    const typeLabel = nextExam.type === 'external' ? '🔴 External' : nextExam.type === 'practical' ? '🧪 Practical' : '🟠 Internal';
+    document.getElementById('nextExamName').textContent = `${nextExam.name || 'Exam'}`;
+    document.getElementById('nextExamType').textContent = typeLabel;
     document.getElementById('nextExamDays').textContent = daysUntil(nextExam.date);
-    nextExamBanner.style.background = nextExam.type === 'external' 
-      ? 'linear-gradient(135deg, var(--danger) 0%, #ff4d4d 100%)' 
-      : 'linear-gradient(135deg, var(--warning) 0%, #ffb74d 100%)';
+    const gradients = {
+      external: 'linear-gradient(135deg, var(--danger) 0%, #ff4d4d 100%)',
+      internal: 'linear-gradient(135deg, var(--warning) 0%, #ffb74d 100%)',
+      practical: 'linear-gradient(135deg, var(--accent) 0%, #64b5f6 100%)'
+    };
+    nextExamBanner.style.background = gradients[nextExam.type] || gradients.internal;
     nextExamBanner.style.display = 'flex';
   } else {
     nextExamBanner.style.display = 'none';
@@ -351,17 +356,18 @@ function renderDashboard() {
         return `<div class="exam-item"><div class="exam-info"><div class="exam-name">${escHtml(e.name)}</div><div class="exam-course">${escHtml(e.course||'')}</div></div><div class="exam-countdown ${days<=3?'soon':''}">${days===0?'Today!':days+'d'}</div></div>`;
       }).join('');
 
-  // Today's To-Dos
+  // Today's To-Dos (only show incomplete ones)
   const tl = document.getElementById('dashboardTodoList');
   if (tl) {
-    if (!STATE.todos || STATE.todos.length === 0) {
-      tl.innerHTML = `<div class="empty-state"><span>📝</span><p>No to-dos yet.</p></div>`;
+    const pendingTodos = (STATE.todos || []).filter(t => !t.done);
+    if (pendingTodos.length === 0) {
+      tl.innerHTML = `<div class="empty-state"><span>✅</span><p>All to-dos completed!</p></div>`;
     } else {
-      tl.innerHTML = STATE.todos.map(t => `
-        <div class="exercise-row ${t.done ? 'done-row' : ''}" style="margin-bottom:8px;">
-          <div class="ex-name" style="${t.done ? 'text-decoration: line-through; color: var(--text-secondary);' : ''}">${escHtml(t.text)}</div>
+      tl.innerHTML = pendingTodos.map(t => `
+        <div class="exercise-row" style="margin-bottom:8px;">
+          <div class="ex-name">${escHtml(t.text)}</div>
           <div style="flex-grow:1;"></div>
-          <div class="exercise-done-check ${t.done ? 'done' : ''}" onclick="toggleTodo('${t.id}')">${t.done ? '✓' : ''}</div>
+          <div class="exercise-done-check" onclick="toggleTodo('${t.id}')"></div>
         </div>
       `).join('');
     }
@@ -428,7 +434,20 @@ function renderAssignments() {
 
 function changeAssignmentStatus(id, status) {
   const a = STATE.assignments.find(x => x.id === id);
-  if (a) { a.status = status; save(); renderDashboard(); renderAssignments(); showToast('Status updated','success'); }
+  if (a) {
+    if (status === 'done') {
+      // Remove completed assignment from active list, archive it
+      if (!STATE.completedAssignments) STATE.completedAssignments = [];
+      a.status = 'done';
+      a.completedAt = new Date().toISOString();
+      STATE.completedAssignments.push(a);
+      STATE.assignments = STATE.assignments.filter(x => x.id !== id);
+      save(); renderDashboard(); renderAssignments();
+      showToast('Assignment completed & archived! 🎉', 'success');
+    } else {
+      a.status = status; save(); renderDashboard(); renderAssignments(); showToast('Status updated','success');
+    }
+  }
 }
 function deleteAssignment(id) {
   STATE.assignments = STATE.assignments.filter(a => a.id !== id);
@@ -456,8 +475,18 @@ function saveAssignment(id = '') {
   const title = document.getElementById('f_title')?.value?.trim();
   if (!title) { showToast('Title required','error'); return; }
   const data = { id: id||genId(), title, course: document.getElementById('f_course')?.value||'', dueDate: document.getElementById('f_due')?.value||'', priority: document.getElementById('f_priority')?.value||'low', status: document.getElementById('f_status')?.value||'not-started', notes: document.getElementById('f_notes')?.value||'' };
-  if (id) { const idx = STATE.assignments.findIndex(a => a.id===id); if (idx>=0) STATE.assignments[idx]=data; } else STATE.assignments.push(data);
-  save(); closeModal(); renderDashboard(); renderAssignments(); showToast(id?'Updated!':'Added!','success');
+  if (data.status === 'done') {
+    // Archive completed assignment
+    if (!STATE.completedAssignments) STATE.completedAssignments = [];
+    data.completedAt = new Date().toISOString();
+    STATE.completedAssignments.push(data);
+    if (id) STATE.assignments = STATE.assignments.filter(a => a.id !== id);
+    save(); closeModal(); renderDashboard(); renderAssignments();
+    showToast('Assignment completed & archived! 🎉', 'success');
+  } else {
+    if (id) { const idx = STATE.assignments.findIndex(a => a.id===id); if (idx>=0) STATE.assignments[idx]=data; } else STATE.assignments.push(data);
+    save(); closeModal(); renderDashboard(); renderAssignments(); showToast(id?'Updated!':'Added!','success');
+  }
 }
 
 // ==================== EXAMS ====================
@@ -484,7 +513,8 @@ function renderExams() {
       const cc=days!=null?(days<=1?'urgent':days<=5?'soon':''):'';
       const cl=days===null?'':days<0?'Passed':days===0?'Today!':String(days);
       const sl=days>0?'days to go':'';
-      return `<div class="exam-card"><div class="exam-card-header"><div><div class="exam-card-name">${escHtml(e.name)}</div><div class="exam-card-course">${escHtml(e.course||'—')}</div></div></div><div><div class="exam-card-countdown ${cc}">${cl}</div><div class="exam-card-countdown-label">${sl}</div><div class="exam-card-date">📅 ${formatDate(e.date)}${e.time?` at ${e.time}`:''}</div>${e.location?`<div class="exam-card-date">📍 ${escHtml(e.location)}</div>`:''}</div><div class="exam-card-actions"><button class="btn btn-sm btn-outline" onclick="editExam('${e.id}')">✏️ Edit</button><button class="btn btn-sm btn-danger" onclick="deleteExam('${e.id}')">🗑️ Delete</button></div></div>`;
+      const completeBtn = days !== null && days <= 0 ? `<button class="btn btn-sm btn-success" onclick="openExamCompletionPopup('${e.id}')">✅ Complete</button>` : '';
+      return `<div class="exam-card"><div class="exam-card-header"><div><div class="exam-card-name">${escHtml(e.name)}</div><div class="exam-card-course">${escHtml(e.course||'—')}</div></div></div><div><div class="exam-card-countdown ${cc}">${cl}</div><div class="exam-card-countdown-label">${sl}</div><div class="exam-card-date">📅 ${formatDate(e.date)}${e.time?` at ${e.time}`:''}</div>${e.location?`<div class="exam-card-date">📍 ${escHtml(e.location)}</div>`:''}</div><div class="exam-card-actions">${completeBtn}<button class="btn btn-sm btn-outline" onclick="editExam('${e.id}')">✏️ Edit</button><button class="btn btn-sm btn-danger" onclick="deleteExam('${e.id}')">🗑️ Delete</button></div></div>`;
     }).join('');
   };
   
@@ -494,6 +524,79 @@ function renderExams() {
 }
 function deleteExam(id) { STATE.exams=STATE.exams.filter(e=>e.id!==id); save(); renderDashboard(); renderExams(); showToast('Deleted','info'); }
 function editExam(id) { const e=STATE.exams.find(x=>x.id===id); openModal('Edit Exam',buildExamForm(e),()=>saveExam(id)); }
+
+// Exam Completion Popup — notes about how the exam went + improvement areas
+function openExamCompletionPopup(id) {
+  const exam = STATE.exams.find(e => e.id === id);
+  if (!exam) return;
+  const typeEmoji = exam.type === 'external' ? '🔴' : exam.type === 'practical' ? '🧪' : '🟠';
+  openModal('✅ Exam Completed!', `
+    <div style="text-align:center; margin-bottom:20px;">
+      <div style="font-size:48px; margin-bottom:8px;">🎉</div>
+      <div style="font-size:18px; font-weight:600; color:var(--text-primary);">${escHtml(exam.name)}</div>
+      <div style="font-size:13px; color:var(--text-muted); margin-top:4px;">${typeEmoji} ${capitalize(exam.type||'internal')} • ${escHtml(exam.course||'No course')} • ${formatDate(exam.date)}</div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">📝 How was the exam? (Overall experience)</label>
+      <textarea class="form-textarea" id="f_examReview" rows="3" placeholder="How did the exam go? What topics were covered? How well did you perform?"></textarea>
+    </div>
+    <div class="form-group">
+      <label class="form-label">🎯 What should you improve for future exams?</label>
+      <textarea class="form-textarea" id="f_examImprovement" rows="3" placeholder="Areas to improve, topics to revise more, time management tips, etc."></textarea>
+    </div>
+    <div class="form-group">
+      <label class="form-label">⭐ Self Rating</label>
+      <div class="exam-rating-bar" id="examRatingBar">
+        <button type="button" class="rating-star" onclick="setExamRating(1)">⭐</button>
+        <button type="button" class="rating-star" onclick="setExamRating(2)">⭐</button>
+        <button type="button" class="rating-star" onclick="setExamRating(3)">⭐</button>
+        <button type="button" class="rating-star" onclick="setExamRating(4)">⭐</button>
+        <button type="button" class="rating-star" onclick="setExamRating(5)">⭐</button>
+      </div>
+      <input type="hidden" id="f_examRating" value="0" />
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="completeExam('${exam.id}')">Save & Complete</button>
+    </div>
+  `);
+}
+
+window._examRating = 0;
+function setExamRating(rating) {
+  window._examRating = rating;
+  document.getElementById('f_examRating').value = rating;
+  const stars = document.querySelectorAll('#examRatingBar .rating-star');
+  stars.forEach((s, i) => {
+    s.style.opacity = i < rating ? '1' : '0.3';
+    s.style.transform = i < rating ? 'scale(1.2)' : 'scale(1)';
+  });
+}
+
+function completeExam(id) {
+  const exam = STATE.exams.find(e => e.id === id);
+  if (!exam) return;
+  const review = document.getElementById('f_examReview')?.value?.trim() || '';
+  const improvement = document.getElementById('f_examImprovement')?.value?.trim() || '';
+  const rating = window._examRating || 0;
+
+  // Archive the exam with feedback
+  if (!STATE.completedExams) STATE.completedExams = [];
+  STATE.completedExams.push({
+    ...exam,
+    completedAt: new Date().toISOString(),
+    review,
+    improvement,
+    rating
+  });
+
+  // Remove from active exams
+  STATE.exams = STATE.exams.filter(e => e.id !== id);
+  window._examRating = 0;
+  save(); closeModal(); renderDashboard(); renderExams();
+  showToast(`${exam.name} completed & archived! 🎉`, 'success');
+}
+
 function buildExamForm(e={}) {
   const co=STATE.courses.map(c=>`<option value="${escHtml(c.name)}" ${e.course===c.name?'selected':''}>${escHtml(c.name)}</option>`).join('');
   return `<div class="form-row"><div class="form-group"><label class="form-label">Exam Name *</label><input class="form-input" id="f_name" value="${escHtml(e.name||'')}"/></div>
@@ -566,17 +669,21 @@ function renderTodos() {
   const list = document.getElementById('todoList');
   if (!list) return;
   if (!STATE.todos) STATE.todos = [];
-  list.innerHTML = STATE.todos.map(t => `
-    <div class="exercise-row ${t.done ? 'done-row' : ''}">
-      <div class="ex-name" style="${t.done ? 'text-decoration: line-through; color: var(--text-secondary);' : ''}">${escHtml(t.text)}</div>
+  const pendingTodos = STATE.todos.filter(t => !t.done);
+  if (pendingTodos.length === 0) {
+    list.innerHTML = STATE.todos.length > 0 
+      ? '<div class="empty-state"><span>✅</span><p>All to-dos completed! Great job!</p></div>'
+      : '<div class="empty-state"><span>📝</span><p>No to-dos yet. Add one above!</p></div>';
+    return;
+  }
+  list.innerHTML = pendingTodos.map(t => `
+    <div class="exercise-row todo-item" id="todo-${t.id}">
+      <div class="ex-name">${escHtml(t.text)}</div>
       <div style="flex-grow:1;"></div>
-      <div class="exercise-done-check ${t.done ? 'done' : ''}" onclick="toggleTodo('${t.id}')">${t.done ? '✓' : ''}</div>
+      <div class="exercise-done-check" onclick="toggleTodo('${t.id}')"></div>
       <button class="btn btn-sm btn-danger" style="margin-left:12px; padding:4px 8px; font-size:14px;" onclick="deleteTodo('${t.id}')">🗑️</button>
     </div>
   `).join('');
-  if (STATE.todos.length === 0) {
-    list.innerHTML = '<div class="empty-state"><span>📝</span><p>No to-dos yet. Add one above!</p></div>';
-  }
 }
 
 function addTodo(text) {
@@ -592,10 +699,23 @@ function addTodo(text) {
 function toggleTodo(id) {
   const todo = STATE.todos.find(t => t.id === id);
   if (todo) {
-    todo.done = !todo.done;
-    save();
-    renderTodos();
-    renderDashboard();
+    // Animate removal then delete
+    const el = document.getElementById(`todo-${id}`);
+    if (el) {
+      el.classList.add('todo-completing');
+      setTimeout(() => {
+        STATE.todos = STATE.todos.filter(t => t.id !== id);
+        save();
+        renderTodos();
+        renderDashboard();
+        showToast('To-do completed! ✅', 'success');
+      }, 400);
+    } else {
+      STATE.todos = STATE.todos.filter(t => t.id !== id);
+      save();
+      renderTodos();
+      renderDashboard();
+    }
   }
 }
 
