@@ -245,6 +245,7 @@ function navigate(view, e) {
     dashboard:'🏠 Dashboard', assignments:'📝 Assignments', exams:'📋 Exams',
     courses:'📚 Courses', planner:'🗓️ Weekly Planner', habits:'🎯 Habit Tracker',
     workout:'💪 Workout', budget:'💰 Budget Tracker', notes:'🗒️ Notes',
+    completed:'✅ Completed',
   };
   document.getElementById('topbarBreadcrumb').textContent = labels[view] || view;
 
@@ -268,6 +269,7 @@ function renderView(view) {
     case 'workout': renderWorkout(); break;
     case 'budget': renderBudget(); break;
     case 'notes': renderNotes(); break;
+    case 'completed': renderCompleted(); break;
   }
 }
 
@@ -740,6 +742,11 @@ function checkTodoNotifications() {
   if (!lastNotification || (now - parseInt(lastNotification) >= intervalMs)) {
     const text = `You have ${pendingTodos} pending To-Do items left to complete!`;
     document.getElementById('reminderModalText').textContent = text;
+    // Set timestamp
+    const tsEl = document.getElementById('reminderTimestamp');
+    if (tsEl) {
+      tsEl.textContent = new Date().toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit' }) + ' IST';
+    }
     document.getElementById('reminderOverlay').classList.add('open');
     const audio = document.getElementById('notificationSound');
     if (audio) {
@@ -1522,6 +1529,122 @@ async function handleSaveNote(id) {
 }
 
 
+// ==================== COMPLETED TAB ====================
+function renderCompleted() {
+  if (!STATE.completedAssignments) STATE.completedAssignments = [];
+  if (!STATE.completedExams) STATE.completedExams = [];
+
+  // Badge
+  const totalCompleted = STATE.completedAssignments.length + STATE.completedExams.length;
+  const cb = document.getElementById('badge-completed');
+  if (cb) {
+    cb.textContent = totalCompleted > 0 ? totalCompleted : '';
+    cb.style.display = totalCompleted > 0 ? 'block' : 'none';
+  }
+
+  // Completed Assignments Table
+  const tbody = document.getElementById('completedAssignmentsTbody');
+  if (tbody) {
+    if (STATE.completedAssignments.length === 0) {
+      tbody.innerHTML = `<tr class="empty-row"><td colspan="6"><div class="empty-state"><span>📭</span><p>No completed assignments yet. Complete assignments to see them here!</p></div></td></tr>`;
+    } else {
+      const sorted = [...STATE.completedAssignments].sort((a, b) => (b.completedAt || '').localeCompare(a.completedAt || ''));
+      tbody.innerHTML = sorted.map(a => {
+        const pc = {'high':'tag-high','medium':'tag-medium','low':'tag-low'}[a.priority] || 'tag-low';
+        const color = getCourseColor(a.course);
+        const completedDate = a.completedAt ? formatDate(a.completedAt.split('T')[0]) : '—';
+        return `<tr>
+          <td><span style="display:flex;align-items:center;gap:8px"><span class="color-dot" style="background:${color}"></span>${escHtml(a.title)}</span></td>
+          <td>${escHtml(a.course || '—')}</td>
+          <td>${a.dueDate ? formatDate(a.dueDate) : '—'}</td>
+          <td><span class="tag ${pc}">${capitalize(a.priority || 'low')}</span></td>
+          <td><span class="tag tag-done">✅ ${completedDate}</span></td>
+          <td><div class="table-actions">
+            <button class="icon-btn" onclick="restoreAssignment('${a.id}')" title="Restore">♻️</button>
+            <button class="icon-btn del" onclick="deleteCompletedAssignment('${a.id}')" title="Delete permanently">🗑️</button>
+          </div></td>
+        </tr>`;
+      }).join('');
+    }
+  }
+
+  // Completed Exams Grid
+  const grid = document.getElementById('completedExamsGrid');
+  if (grid) {
+    if (STATE.completedExams.length === 0) {
+      grid.innerHTML = `<div class="empty-state full-empty"><span>📭</span><p>No completed exams yet. Complete exams to see your review notes here!</p></div>`;
+    } else {
+      const sorted = [...STATE.completedExams].sort((a, b) => (b.completedAt || '').localeCompare(a.completedAt || ''));
+      grid.innerHTML = sorted.map(e => {
+        const typeEmoji = e.type === 'external' ? '🔴' : e.type === 'practical' ? '🧪' : '🟠';
+        const typeLabel = capitalize(e.type || 'internal');
+        const stars = e.rating ? '⭐'.repeat(e.rating) + '☆'.repeat(5 - e.rating) : 'No rating';
+        const completedDate = e.completedAt ? formatDate(e.completedAt.split('T')[0]) : '—';
+        return `<div class="exam-card completed-exam-card">
+          <div class="exam-card-header">
+            <div>
+              <div class="exam-card-name">${escHtml(e.name)}</div>
+              <div class="exam-card-course">${typeEmoji} ${typeLabel} • ${escHtml(e.course || '—')}</div>
+            </div>
+            <div class="tag tag-done" style="font-size:11px;">✅ Done</div>
+          </div>
+          <div style="padding:0 16px;">
+            <div style="font-size:12px; color:var(--text-muted); margin-bottom:8px;">📅 ${formatDate(e.date)} • Completed ${completedDate}</div>
+            <div style="margin-bottom:6px; font-size:13px;">${stars}</div>
+            ${e.review ? `<div style="background:var(--bg-tertiary); padding:10px; border-radius:8px; margin-bottom:8px; font-size:13px;">
+              <div style="font-weight:600; font-size:11px; color:var(--accent); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:4px;">📝 Review</div>
+              <div style="color:var(--text-secondary); white-space:pre-wrap;">${escHtml(e.review)}</div>
+            </div>` : ''}
+            ${e.improvement ? `<div style="background:var(--orange-bg); padding:10px; border-radius:8px; margin-bottom:8px; font-size:13px;">
+              <div style="font-weight:600; font-size:11px; color:var(--orange); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:4px;">🎯 Improvement Notes</div>
+              <div style="color:var(--text-secondary); white-space:pre-wrap;">${escHtml(e.improvement)}</div>
+            </div>` : ''}
+          </div>
+          <div class="exam-card-actions">
+            <button class="btn btn-sm btn-outline" onclick="restoreExam('${e.id}')">♻️ Restore</button>
+            <button class="btn btn-sm btn-danger" onclick="deleteCompletedExam('${e.id}')">🗑️ Delete</button>
+          </div>
+        </div>`;
+      }).join('');
+    }
+  }
+}
+
+function restoreAssignment(id) {
+  const idx = STATE.completedAssignments.findIndex(a => a.id === id);
+  if (idx >= 0) {
+    const a = STATE.completedAssignments.splice(idx, 1)[0];
+    a.status = 'in-progress';
+    delete a.completedAt;
+    STATE.assignments.push(a);
+    save(); renderCompleted(); renderAssignments(); renderDashboard();
+    showToast('Assignment restored!', 'success');
+  }
+}
+
+function deleteCompletedAssignment(id) {
+  STATE.completedAssignments = STATE.completedAssignments.filter(a => a.id !== id);
+  save(); renderCompleted();
+  showToast('Permanently deleted', 'info');
+}
+
+function restoreExam(id) {
+  const idx = STATE.completedExams.findIndex(e => e.id === id);
+  if (idx >= 0) {
+    const e = STATE.completedExams.splice(idx, 1)[0];
+    delete e.completedAt; delete e.review; delete e.improvement; delete e.rating;
+    STATE.exams.push(e);
+    save(); renderCompleted(); renderExams(); renderDashboard();
+    showToast('Exam restored!', 'success');
+  }
+}
+
+function deleteCompletedExam(id) {
+  STATE.completedExams = STATE.completedExams.filter(e => e.id !== id);
+  save(); renderCompleted();
+  showToast('Permanently deleted', 'info');
+}
+
 // ==================== MODAL ====================
 function openModal(title, bodyHtml) {
   document.getElementById('modalTitle').textContent = title;
@@ -1738,6 +1861,7 @@ function renderAll() {
   renderWorkoutHistory();
   renderBudget();
   renderNotes();
+  renderCompleted();
   updateSemesterUI();
   if (STATE.theme==='light') document.body.classList.add('light'); else document.body.classList.remove('light');
 }
@@ -1799,8 +1923,14 @@ function init() {
   load();
   if (STATE.theme==='light') document.body.classList.add('light');
 
-  // Current date
-  document.getElementById('currentDate').textContent = new Date().toLocaleDateString('en-IN',{weekday:'short',day:'numeric',month:'short',year:'numeric'});
+  // Current date — IST (Delhi)
+  function updateISTClock() {
+    const now = new Date();
+    document.getElementById('currentDate').textContent = now.toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+    document.getElementById('liveClock').textContent = now.toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+  }
+  updateISTClock();
+  setInterval(updateISTClock, 1000);
 
   // Theme toggle
   document.getElementById('themeToggle').addEventListener('click',()=>{
@@ -1908,6 +2038,21 @@ function init() {
       btn.classList.add('active');
       const tabId = btn.dataset.subtab;
       document.querySelectorAll('#view-planner .subtab-panel').forEach(p => p.classList.remove('active'));
+      const panel = document.getElementById(`subtab-${tabId}`);
+      if (panel) panel.classList.add('active');
+    });
+  }
+
+  // Completed Tabs
+  const completedTabs = document.getElementById('completedSubTabs');
+  if (completedTabs) {
+    completedTabs.addEventListener('click', e => {
+      const btn = e.target.closest('.sub-tab');
+      if (!btn) return;
+      completedTabs.querySelectorAll('.sub-tab').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      const tabId = btn.dataset.subtab;
+      document.querySelectorAll('#view-completed .subtab-panel').forEach(p => p.classList.remove('active'));
       const panel = document.getElementById(`subtab-${tabId}`);
       if (panel) panel.classList.add('active');
     });
