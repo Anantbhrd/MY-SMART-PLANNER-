@@ -42,10 +42,10 @@ const STATE = {
   dashboardTiles: [
     { id: 'deadlines', title: '⏰ Upcoming Deadlines', visible: true, order: 1 },
     { id: 'exams', title: '📋 Exam Countdown', visible: true, order: 2 },
-    { id: 'todos', title: '📝 Today\\'s To-Do List', visible: true, order: 3 },
-    { id: 'workout', title: '💪 Today\\'s Workout', visible: true, order: 4 },
+    { id: 'todos', title: "📝 Today's To-Do List", visible: true, order: 3 },
+    { id: 'workout', title: "💪 Today's Workout", visible: true, order: 4 },
     { id: 'notes', title: '🗒️ Quick Note', visible: true, order: 5 },
-    { id: 'habits', title: '🎯 Today\\'s Habits', visible: true, order: 6 },
+    { id: 'habits', title: "🎯 Today's Habits", visible: true, order: 6 },
     { id: 'budget', title: '💰 Budget Summary', visible: false, order: 7 }
   ]
 };
@@ -435,10 +435,10 @@ function renderDashboard() {
     const limit = parseFloat(STATE.budget.limit||0);
     const remaining = limit - total;
     const pct = limit > 0 ? Math.min(100, Math.round(total/limit*100)) : 0;
-    dashBudgetRemaining.textContent = \`₹\${remaining.toFixed(2)}\`;
-    dashBudgetRemaining.className = \`budget-value \${remaining>=0?'green':'red'}\`;
-    document.getElementById('dashBudgetFill').style.width = \`\${pct}%\`;
-    document.getElementById('dashBudgetPct').textContent = \`\${pct}% used\`;
+    dashBudgetRemaining.textContent = `₹${remaining.toFixed(2)}`;
+    dashBudgetRemaining.className = `budget-value ${remaining>=0?'green':'red'}`;
+    document.getElementById('dashBudgetFill').style.width = `${pct}%`;
+    document.getElementById('dashBudgetPct').textContent = `${pct}% used`;
   }
 }
 
@@ -1997,15 +1997,7 @@ function init() {
   // Semester settings
   document.getElementById('semesterSettingsBtn').addEventListener('click',openSemesterSettings);
 
-  // Quick note
-  document.getElementById('clearNote').addEventListener('click',()=>{document.getElementById('quickNote').value='';localStorage.removeItem('quickNote');});
-  document.getElementById('saveNote').addEventListener('click',()=>{
-    const txt=document.getElementById('quickNote').value.trim();
-    if (!txt) return;
-    STATE.notes.push({id:genId(),title:'Quick Note',content:txt,updatedAt:new Date().toISOString(),createdAt:new Date().toISOString()});
-    localStorage.setItem('quickNote',txt); save(); showToast('Saved to Notes!','success');
-  });
-  document.getElementById('quickNote').addEventListener('input',()=>localStorage.setItem('quickNote',document.getElementById('quickNote').value));
+  // Quick note logic is now handled via inline onclick/oninput in getTileHTML
 
   // Top Add Btn
   document.getElementById('topAddBtn').addEventListener('click',()=>{
@@ -2224,7 +2216,7 @@ function getTileHTML(tileId) {
             <button class="card-action" onclick="navigate('notes')">All notes →</button>
           </div>
           <div id="dailyQuote" style="margin-bottom: 10px; font-style: italic; color: var(--accent); font-size: 13px; text-align: center; background: var(--accent-alpha); padding: 8px; border-radius: 6px;"></div>
-          <textarea class="quick-note-area" id="quickNote" placeholder="Jot down a quick thought..."></textarea>
+          <textarea class="quick-note-area" id="quickNote" placeholder="Jot down a quick thought..." oninput="localStorage.setItem('quickNote', this.value)"></textarea>
           <div class="quick-note-actions" style="margin-top:8px">
             <button class="btn btn-sm btn-outline" onclick="document.getElementById('quickNote').value=''; localStorage.removeItem('quickNote')">Clear</button>
             <button class="btn btn-sm btn-primary" onclick="saveDashboardQuickNote()">Save Note →</button>
