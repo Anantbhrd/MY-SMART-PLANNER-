@@ -230,9 +230,9 @@ input, select, textarea { font-family: var(--font); }
 .stat-green .stat-value { color: var(--green); }
 .stat-orange .stat-value { color: var(--orange); }
 
-/* --- TWO COLUMN --- */
-.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-@media (max-width: 900px) { .two-col { grid-template-columns: 1fr; } }
+/* --- TWO COLUMN & DASHBOARD GRID --- */
+.two-col, .dashboard-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+@media (max-width: 900px) { .two-col, .dashboard-grid { grid-template-columns: 1fr; } }
 
 /* --- CARDS --- */
 .card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 20px; display: flex; flex-direction: column; gap: 14px; }

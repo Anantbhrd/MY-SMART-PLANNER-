@@ -38,7 +38,16 @@ const STATE = {
   completedExams: [],
   completedAssignments: [],
   lastTodoResetDate: '',
-  todoNotificationInterval: 6
+  todoNotificationInterval: 6,
+  dashboardTiles: [
+    { id: 'deadlines', title: '⏰ Upcoming Deadlines', visible: true, order: 1 },
+    { id: 'exams', title: '📋 Exam Countdown', visible: true, order: 2 },
+    { id: 'todos', title: '📝 Today\\'s To-Do List', visible: true, order: 3 },
+    { id: 'workout', title: '💪 Today\\'s Workout', visible: true, order: 4 },
+    { id: 'notes', title: '🗒️ Quick Note', visible: true, order: 5 },
+    { id: 'habits', title: '🎯 Today\\'s Habits', visible: true, order: 6 },
+    { id: 'budget', title: '💰 Budget Summary', visible: false, order: 7 }
+  ]
 };
 
 // ==================== FIREBASE CONFIG ====================
@@ -92,6 +101,7 @@ function load() {
       STATE.completedAssignments = d.completedAssignments || [];
       if (d.lastTodoResetDate) STATE.lastTodoResetDate = d.lastTodoResetDate;
       if (d.todoNotificationInterval) STATE.todoNotificationInterval = d.todoNotificationInterval;
+      if (d.dashboardTiles) STATE.dashboardTiles = d.dashboardTiles;
       checkTodoReset();
     }
   } catch(e) {}
@@ -335,28 +345,40 @@ function renderDashboard() {
 
   updateSemesterUI();
 
+  // Generate dashboard tiles dynamically
+  const dGrid = document.getElementById('dashboardGrid');
+  if (dGrid) {
+    const visibleTiles = [...STATE.dashboardTiles].filter(t => t.visible).sort((a,b) => a.order - b.order);
+    dGrid.innerHTML = visibleTiles.map(t => getTileHTML(t.id)).join('');
+  }
+
   // Deadlines
   const dlList = document.getElementById('deadlineList');
   const upcoming = STATE.assignments.filter(a => a.status !== 'done' && a.dueDate).sort((a,b) => a.dueDate.localeCompare(b.dueDate)).slice(0,5);
-  dlList.innerHTML = upcoming.length === 0
-    ? `<div class="empty-state"><span>📭</span><p>No upcoming deadlines.</p></div>`
-    : upcoming.map(a => {
-        const days = daysUntil(a.dueDate);
-        const color = getCourseColor(a.course);
-        const daysLabel = days === null ? '' : days < 0 ? `${Math.abs(days)}d overdue` : days === 0 ? 'Due today' : `${days}d left`;
-        const cls = days !== null && days <= 2 ? 'overdue' : '';
-        return `<div class="deadline-item"><div class="deadline-dot" style="background:${color}"></div><div class="dl-info"><div class="dl-title">${escHtml(a.title)}</div><div class="dl-course">${escHtml(a.course||'No course')}</div></div><div class="dl-date ${cls}">${daysLabel}</div></div>`;
-      }).join('');
+  if (dlList) {
+    const upcoming = STATE.assignments.filter(a => a.status !== 'done' && a.dueDate).sort((a,b) => a.dueDate.localeCompare(b.dueDate)).slice(0,5);
+    dlList.innerHTML = upcoming.length === 0
+      ? `<div class="empty-state"><span>📭</span><p>No upcoming deadlines.</p></div>`
+      : upcoming.map(a => {
+          const days = daysUntil(a.dueDate);
+          const color = getCourseColor(a.course);
+          const daysLabel = days === null ? '' : days < 0 ? `${Math.abs(days)}d overdue` : days === 0 ? 'Due today' : `${days}d left`;
+          const cls = days !== null && days <= 2 ? 'overdue' : '';
+          return `<div class="deadline-item"><div class="deadline-dot" style="background:${color}"></div><div class="dl-info"><div class="dl-title">${escHtml(a.title)}</div><div class="dl-course">${escHtml(a.course||'No course')}</div></div><div class="dl-date ${cls}">${daysLabel}</div></div>`;
+        }).join('');
+  }
 
   // Exam countdown
   const ecList = document.getElementById('examCountdownList');
-  const upExams = STATE.exams.filter(e => daysUntil(e.date) >= 0).sort((a,b) => a.date.localeCompare(b.date)).slice(0,4);
-  ecList.innerHTML = upExams.length === 0
-    ? `<div class="empty-state"><span>📭</span><p>No exams scheduled.</p></div>`
-    : upExams.map(e => {
-        const days = daysUntil(e.date);
-        return `<div class="exam-item"><div class="exam-info"><div class="exam-name">${escHtml(e.name)}</div><div class="exam-course">${escHtml(e.course||'')}</div></div><div class="exam-countdown ${days<=3?'soon':''}">${days===0?'Today!':days+'d'}</div></div>`;
-      }).join('');
+  if (ecList) {
+    const upExams = STATE.exams.filter(e => daysUntil(e.date) >= 0).sort((a,b) => a.date.localeCompare(b.date)).slice(0,4);
+    ecList.innerHTML = upExams.length === 0
+      ? `<div class="empty-state"><span>📭</span><p>No exams scheduled.</p></div>`
+      : upExams.map(e => {
+          const days = daysUntil(e.date);
+          return `<div class="exam-item"><div class="exam-info"><div class="exam-name">${escHtml(e.name)}</div><div class="exam-course">${escHtml(e.course||'')}</div></div><div class="exam-countdown ${days<=3?'soon':''}">${days===0?'Today!':days+'d'}</div></div>`;
+        }).join('');
+  }
 
   // Today's To-Dos (only show incomplete ones)
   const tl = document.getElementById('dashboardTodoList');
@@ -377,28 +399,47 @@ function renderDashboard() {
 
   // Workout today
   const dws = document.getElementById('dashWorkoutSummary');
-  const gymToday = STATE.workout.gymLogs.filter(g => g.date === td);
-  const badToday = STATE.workout.badmintonLogs.filter(b => b.date === td);
-  if (gymToday.length === 0 && badToday.length === 0) {
-    dws.innerHTML = `<div class="empty-state"><span>🏋️</span><p>No workout logged today.</p></div>`;
-  } else {
-    const items = [];
-    gymToday.forEach(g => items.push(`<div class="deadline-item"><div class="deadline-dot" style="background:#4a90e2"></div><div class="dl-info"><div class="dl-title">🏋️ Gym Session</div><div class="dl-course">${g.exercises?.length||0} exercises</div></div><div class="dl-date">${g.duration||'?'} min</div></div>`));
-    badToday.forEach(b => items.push(`<div class="deadline-item"><div class="deadline-dot" style="background:#4caf7d"></div><div class="dl-info"><div class="dl-title">🏸 Badminton</div><div class="dl-course">${b.partner?`vs ${escHtml(b.partner)}`:''}</div></div><div class="dl-date">${b.duration||'?'} min</div></div>`));
-    dws.innerHTML = items.join('');
+  if (dws) {
+    const gymToday = STATE.workout.gymLogs.filter(g => g.date === td);
+    const badToday = STATE.workout.badmintonLogs.filter(b => b.date === td);
+    if (gymToday.length === 0 && badToday.length === 0) {
+      dws.innerHTML = `<div class="empty-state"><span>🏋️</span><p>No workout logged today.</p></div>`;
+    } else {
+      const items = [];
+      gymToday.forEach(g => items.push(`<div class="deadline-item"><div class="deadline-dot" style="background:#4a90e2"></div><div class="dl-info"><div class="dl-title">🏋️ Gym Session</div><div class="dl-course">${g.exercises?.length||0} exercises</div></div><div class="dl-date">${g.duration||'?'} min</div></div>`));
+      badToday.forEach(b => items.push(`<div class="deadline-item"><div class="deadline-dot" style="background:#4caf7d"></div><div class="dl-info"><div class="dl-title">🏸 Badminton</div><div class="dl-course">${b.partner?`vs ${escHtml(b.partner)}`:''}</div></div><div class="dl-date">${b.duration||'?'} min</div></div>`));
+      dws.innerHTML = items.join('');
+    }
   }
 
   // Habits mini
   const hm = document.getElementById('habitMiniGrid');
-  hm.innerHTML = STATE.habits.length === 0
-    ? `<div class="empty-state"><span>🌱</span><p>No habits added yet.</p></div>`
-    : STATE.habits.map(h => {
-        const checked = !!STATE.habitLogs[`${h.id}_${td}`];
-        return `<div class="habit-mini-item"><span style="font-size:18px">${h.emoji||'✅'}</span><span class="habit-mini-name">${escHtml(h.name)}</span><div class="habit-mini-check ${checked?'checked':''}" onclick="toggleHabitLog('${h.id}','${td}')">${checked?'✓':''}</div></div>`;
-      }).join('');
+  if (hm) {
+    hm.innerHTML = STATE.habits.length === 0
+      ? `<div class="empty-state"><span>🌱</span><p>No habits added yet.</p></div>`
+      : STATE.habits.map(h => {
+          const checked = !!STATE.habitLogs[`${h.id}_${td}`];
+          return `<div class="habit-mini-item"><span style="font-size:18px">${h.emoji||'✅'}</span><span class="habit-mini-name">${escHtml(h.name)}</span><div class="habit-mini-check ${checked?'checked':''}" onclick="toggleHabitLog('${h.id}','${td}')">${checked?'✓':''}</div></div>`;
+        }).join('');
+  }
 
   // Quick note
-  document.getElementById('quickNote').value = localStorage.getItem('quickNote') || '';
+  const qn = document.getElementById('quickNote');
+  if (qn) qn.value = localStorage.getItem('quickNote') || '';
+
+  // Budget
+  const dashBudgetRemaining = document.getElementById('dashBudgetRemaining');
+  if (dashBudgetRemaining) {
+    const expenses = STATE.budget.expenses || [];
+    const total = expenses.reduce((s,e)=>s+parseFloat(e.amount||0),0);
+    const limit = parseFloat(STATE.budget.limit||0);
+    const remaining = limit - total;
+    const pct = limit > 0 ? Math.min(100, Math.round(total/limit*100)) : 0;
+    dashBudgetRemaining.textContent = \`₹\${remaining.toFixed(2)}\`;
+    dashBudgetRemaining.className = \`budget-value \${remaining>=0?'green':'red'}\`;
+    document.getElementById('dashBudgetFill').style.width = \`\${pct}%\`;
+    document.getElementById('dashBudgetPct').textContent = \`\${pct}% used\`;
+  }
 }
 
 function toggleHabitLog(hid, date) {
@@ -2140,6 +2181,176 @@ function init() {
   // Init Auth & Render
   initAuth();
 }
+
+// ==================== DASHBOARD CUSTOMIZATION ====================
+function getTileHTML(tileId) {
+  switch(tileId) {
+    case 'deadlines':
+      return `<div class="card">
+          <div class="card-header">
+            <h2>⏰ Upcoming Deadlines</h2>
+            <button class="card-action" onclick="navigate('assignments')">View all →</button>
+          </div>
+          <div class="deadline-list" id="deadlineList"></div>
+        </div>`;
+    case 'exams':
+      return `<div class="card">
+          <div class="card-header">
+            <h2>📋 Exam Countdown</h2>
+            <button class="card-action" onclick="navigate('exams')">View all →</button>
+          </div>
+          <div class="exam-list" id="examCountdownList"></div>
+        </div>`;
+    case 'todos':
+      return `<div class="card">
+          <div class="card-header">
+            <h2>📝 Today's To-Do List</h2>
+            <button class="card-action" onclick="navigate('planner'); setTimeout(()=>document.querySelector('[data-subtab=\\'planner-todo\\']')?.click(), 10)">Open To-Dos →</button>
+          </div>
+          <div id="dashboardTodoList" class="exercise-list" style="margin-top: 12px;"></div>
+        </div>`;
+    case 'workout':
+      return `<div class="card">
+          <div class="card-header">
+            <h2>💪 Today's Workout</h2>
+            <button class="card-action" onclick="navigate('workout')">Full tracker →</button>
+          </div>
+          <div id="dashWorkoutSummary" class="deadline-list"></div>
+        </div>`;
+    case 'notes':
+      return `<div class="card">
+          <div class="card-header">
+            <h2>🗒️ Quick Note</h2>
+            <button class="card-action" onclick="navigate('notes')">All notes →</button>
+          </div>
+          <div id="dailyQuote" style="margin-bottom: 10px; font-style: italic; color: var(--accent); font-size: 13px; text-align: center; background: var(--accent-alpha); padding: 8px; border-radius: 6px;"></div>
+          <textarea class="quick-note-area" id="quickNote" placeholder="Jot down a quick thought..."></textarea>
+          <div class="quick-note-actions" style="margin-top:8px">
+            <button class="btn btn-sm btn-outline" onclick="document.getElementById('quickNote').value=''; localStorage.removeItem('quickNote')">Clear</button>
+            <button class="btn btn-sm btn-primary" onclick="saveDashboardQuickNote()">Save Note →</button>
+          </div>
+        </div>`;
+    case 'habits':
+      return `<div class="card">
+          <div class="card-header">
+            <h2>🎯 Today's Habits</h2>
+            <button class="card-action" onclick="navigate('habits')">Full tracker →</button>
+          </div>
+          <div class="habit-mini-grid" id="habitMiniGrid"></div>
+        </div>`;
+    case 'budget':
+      return `<div class="card">
+          <div class="card-header">
+            <h2>💰 Budget Summary</h2>
+            <button class="card-action" onclick="navigate('budget')">Full budget →</button>
+          </div>
+          <div class="budget-stat-card" style="margin-top: 10px; flex-grow: 1;">
+            <div class="budget-label">Remaining this month</div>
+            <div class="budget-value" id="dashBudgetRemaining">₹0.00</div>
+            <div class="budget-progress-wrap" style="margin-top:12px;">
+              <div class="budget-progress-fill" id="dashBudgetFill" style="width:0%"></div>
+            </div>
+            <div class="budget-pct" id="dashBudgetPct" style="margin-top:4px;">0% used</div>
+          </div>
+        </div>`;
+  }
+  return '';
+}
+
+function saveDashboardQuickNote() {
+  const txt = document.getElementById('quickNote')?.value?.trim();
+  if (!txt) return;
+  STATE.notes.push({id:genId(),title:'Quick Note',content:txt,updatedAt:new Date().toISOString(),createdAt:new Date().toISOString()});
+  localStorage.setItem('quickNote',txt); save(); showToast('Saved to Notes!','success');
+}
+
+let tempDashboardTiles = [];
+function openDashboardCustomization() {
+  tempDashboardTiles = JSON.parse(JSON.stringify(STATE.dashboardTiles));
+  tempDashboardTiles.sort((a,b) => a.order - b.order);
+  renderCustomizationModal();
+}
+
+function renderCustomizationModal() {
+  const html = `
+    <div style="margin-bottom: 16px; font-size: 13px; color: var(--text-muted);">Drag or use arrows to reorder tiles. Check/uncheck to show or hide tiles.</div>
+    <div class="customization-list" id="customizationList" style="display:flex; flex-direction:column; gap:8px;">
+      ${tempDashboardTiles.map((t, i) => `
+        <div class="customization-item" style="display:flex; align-items:center; gap:12px; padding:10px; background:var(--bg-tertiary); border-radius:var(--radius-sm); border:1px solid var(--border);">
+          <div style="display:flex; flex-direction:column; gap:2px;">
+            <button class="icon-btn" style="width:20px; height:20px;" onclick="moveTileUp(${i})" ${i===0?'disabled':''}>▲</button>
+            <button class="icon-btn" style="width:20px; height:20px;" onclick="moveTileDown(${i})" ${i===tempDashboardTiles.length-1?'disabled':''}>▼</button>
+          </div>
+          <div class="checkbox-row" style="flex:1;">
+            <input type="checkbox" id="tile_${t.id}" ${t.visible ? 'checked' : ''} onchange="toggleTileVis(${i}, this.checked)" />
+            <label for="tile_${t.id}" style="font-weight:600; font-size:14px; cursor:pointer;">${t.title}</label>
+          </div>
+        </div>
+      `).join('')}
+    </div>
+    <div class="form-actions" style="margin-top:20px;">
+      <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="confirmSaveDashboard()">Save Changes</button>
+    </div>
+  `;
+  openModal('⚙️ Customize Dashboard', html);
+}
+
+function moveTileUp(index) {
+  if (index <= 0) return;
+  const temp = tempDashboardTiles[index - 1];
+  tempDashboardTiles[index - 1] = tempDashboardTiles[index];
+  tempDashboardTiles[index] = temp;
+  tempDashboardTiles.forEach((t, i) => t.order = i + 1);
+  renderCustomizationModal();
+}
+
+function moveTileDown(index) {
+  if (index >= tempDashboardTiles.length - 1) return;
+  const temp = tempDashboardTiles[index + 1];
+  tempDashboardTiles[index + 1] = tempDashboardTiles[index];
+  tempDashboardTiles[index] = temp;
+  tempDashboardTiles.forEach((t, i) => t.order = i + 1);
+  renderCustomizationModal();
+}
+
+function toggleTileVis(index, isVisible) {
+  tempDashboardTiles[index].visible = isVisible;
+}
+
+function confirmSaveDashboard() {
+  const html = `
+    <div style="text-align:center; padding: 20px 0;">
+      <div style="font-size: 48px; margin-bottom: 12px;">⚠️</div>
+      <h3 style="margin-bottom: 8px;">Are you sure?</h3>
+      <p style="color:var(--text-muted); font-size: 14px; margin-bottom: 24px;">Do you want to save these changes to your dashboard layout?</p>
+      <div style="display:flex; gap: 12px; justify-content: center;">
+        <button class="btn btn-outline" onclick="renderCustomizationModal()">No, go back</button>
+        <button class="btn btn-primary" onclick="executeSaveDashboard()">Yes, save it!</button>
+      </div>
+    </div>
+  `;
+  openModal('Confirm Changes', html);
+}
+
+function executeSaveDashboard() {
+  STATE.dashboardTiles = tempDashboardTiles;
+  save();
+  renderDashboard();
+  
+  // Show successful popup
+  const html = `
+    <div style="text-align:center; padding: 20px 0;">
+      <div style="font-size: 48px; margin-bottom: 12px; animation: bounceIn 0.5s;">✅</div>
+      <h3 style="margin-bottom: 8px;">Saved successfully!</h3>
+      <p style="color:var(--text-muted); font-size: 14px; margin-bottom: 24px;">Your dashboard has been updated.</p>
+      <button class="btn btn-primary" onclick="closeModal()">Awesome!</button>
+    </div>
+  `;
+  openModal('Success', html);
+  showToast('Dashboard layout saved successfully', 'success');
+}
+
 
 // ==================== SEMESTER STATS ====================
 function openSemesterStatsModal() {

@@ -173,77 +173,12 @@
         <div class="semester-banner-bar-wrap">
           <div class="semester-banner-fill" id="sbFill" style="width:0%"></div>
         </div>
-        <div class="semester-banner-pct" id="sbPct">0%</div>
-      </div>
-
-      <div class="two-col">
-        <div class="card">
-          <div class="card-header">
-            <h2>⏰ Upcoming Deadlines</h2>
-            <button class="card-action" data-view="assignments">View all →</button>
-          </div>
-          <div class="deadline-list" id="deadlineList">
-            <div class="empty-state"><span>📭</span><p>No upcoming deadlines.</p></div>
-          </div>
+        <div class="dashboard-grid" id="dashboardGrid">
+          <!-- Dashboard tiles are rendered dynamically here -->
         </div>
-
-        <div class="card">
-          <div class="card-header">
-            <h2>📋 Exam Countdown</h2>
-            <button class="card-action" data-view="exams">View all →</button>
-          </div>
-          <div class="exam-list" id="examCountdownList">
-            <div class="empty-state"><span>📭</span><p>No exams scheduled.</p></div>
-          </div>
+        <div style="text-align: center; margin-top: 32px; padding-top: 24px; border-top: 1px dashed var(--border);">
+          <button class="btn btn-outline" id="customizeDashboardBtn" onclick="openDashboardCustomization()">⚙️ Customize Dashboard</button>
         </div>
-      </div>
-
-      <div class="two-col" style="margin-top: 24px;">
-        <div class="card">
-          <div class="card-header">
-            <h2>📝 Today's To-Do List</h2>
-            <button class="card-action" data-view="planner" onclick="document.querySelector('[data-subtab=\'planner-todo\']')?.click()">Open To-Dos →</button>
-          </div>
-          <div id="dashboardTodoList" class="exercise-list" style="margin-top: 12px;">
-            <div class="empty-state"><span>📝</span><p>No to-dos yet.</p></div>
-          </div>
-        </div>
-
-        <div class="card">
-          <div class="card-header">
-            <h2>💪 Today's Workout</h2>
-            <button class="card-action" data-view="workout">Full tracker →</button>
-          </div>
-          <div id="dashWorkoutSummary" class="deadline-list">
-            <div class="empty-state"><span>🏋️</span><p>No workout logged today.</p></div>
-          </div>
-        </div>
-      </div>
-
-      <div class="two-col" style="margin-top:24px;">
-        <div class="card">
-          <div class="card-header">
-            <h2>🗒️ Quick Note</h2>
-            <button class="card-action" data-view="notes">All notes →</button>
-          </div>
-          <div id="dailyQuote" style="margin-bottom: 10px; font-style: italic; color: var(--accent); font-size: 13px; text-align: center; background: var(--accent-alpha); padding: 8px; border-radius: 6px;"></div>
-          <textarea class="quick-note-area" id="quickNote" placeholder="Jot down a quick thought..."></textarea>
-          <div class="quick-note-actions">
-            <button class="btn btn-sm btn-outline" id="clearNote">Clear</button>
-            <button class="btn btn-sm btn-primary" id="saveNote">Save Note →</button>
-          </div>
-        </div>
-
-        <div class="card">
-          <div class="card-header">
-            <h2>🎯 Today's Habits</h2>
-            <button class="card-action" data-view="habits">Full tracker →</button>
-          </div>
-          <div class="habit-mini-grid" id="habitMiniGrid">
-            <div class="empty-state"><span>🌱</span><p>No habits added yet. Go to Habit Tracker!</p></div>
-          </div>
-        </div>
-      </div>
     </section>
 
     <!-- ASSIGNMENTS VIEW -->
