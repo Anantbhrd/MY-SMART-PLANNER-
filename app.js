@@ -808,22 +808,24 @@ function addTodo(text) {
 function toggleTodo(id) {
   const todo = STATE.todos.find(t => t.id === id);
   if (todo) {
-    // Animate removal then delete
+    todo.done = !todo.done;
+    
     const el = document.getElementById(`todo-${id}`);
-    if (el) {
+    if (todo.done && el) {
       el.classList.add('todo-completing');
       setTimeout(() => {
-        STATE.todos = STATE.todos.filter(t => t.id !== id);
         save();
         renderTodos();
         renderDashboard();
         showToast('To-do completed! ✅', 'success');
       }, 400);
     } else {
-      STATE.todos = STATE.todos.filter(t => t.id !== id);
       save();
       renderTodos();
       renderDashboard();
+      if (todo.done) {
+        showToast('To-do completed! ✅', 'success');
+      }
     }
   }
 }
