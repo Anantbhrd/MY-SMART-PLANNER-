@@ -453,9 +453,12 @@
 
     <!-- BUDGET VIEW -->
     <section class="view" id="view-budget">
-      <div class="page-header">
-        <h1>💰 Budget Tracker</h1>
-        <p class="page-sub">Keep your finances in check as a student.</p>
+      <div class="page-header" style="display:flex; justify-content:space-between; align-items:flex-end; flex-wrap:wrap; gap:10px;">
+        <div>
+          <h1 style="display:flex; align-items:center; gap:12px;">💰 Budget Tracker <span id="budgetMonthLabel" style="font-size:14px; font-weight:600; background:var(--bg-tertiary); padding:4px 10px; border-radius:12px; color:var(--text-secondary);"></span></h1>
+          <p class="page-sub">Keep your finances in check as a student.</p>
+        </div>
+        <button class="btn btn-outline" id="viewPastMonthsBtn">📅 View Past Months</button>
       </div>
       <div class="budget-overview">
         <div class="budget-stat-card">

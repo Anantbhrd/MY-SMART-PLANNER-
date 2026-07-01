@@ -430,7 +430,8 @@ function renderDashboard() {
   // Budget
   const dashBudgetRemaining = document.getElementById('dashBudgetRemaining');
   if (dashBudgetRemaining) {
-    const expenses = STATE.budget.expenses || [];
+    const currentMonth = window.currentBudgetMonth || new Date().toISOString().substring(0, 7);
+    const expenses = (STATE.budget.expenses || []).filter(e => e.date && e.date.substring(0, 7) === currentMonth);
     const total = expenses.reduce((s,e)=>s+parseFloat(e.amount||0),0);
     const limit = parseFloat(STATE.budget.limit||0);
     const remaining = limit - total;
@@ -1530,52 +1531,67 @@ function renderWorkoutHistory() {
 
 // ==================== BUDGET ====================
 let budgetFilter = 'all';
+window.currentBudgetMonth = null;
+
 function renderBudget() {
+  if (!window.currentBudgetMonth) window.currentBudgetMonth = today().substring(0, 7);
+  const isCurrentMonth = window.currentBudgetMonth === today().substring(0, 7);
+  
   const bFilterGroup = document.getElementById('budgetFilterGroup');
   if (bFilterGroup) {
     bFilterGroup.innerHTML = `<button class="filter-btn ${budgetFilter==='all'?'active':''}" data-budget-filter="all">All</button>` +
       STATE.categories.budget.map(c => `<button class="filter-btn ${budgetFilter===c?'active':''}" data-budget-filter="${escHtml(c)}">${escHtml(c)}</button>`).join('');
   }
-  const expenses = STATE.budget.expenses;
+  
+  const monthName = new Date(window.currentBudgetMonth + '-01').toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
+  const lbl = document.getElementById('budgetMonthLabel');
+  if (lbl) lbl.innerHTML = monthName + (isCurrentMonth ? ' <span style="font-size:11px; background:var(--accent); color:#fff; padding:2px 6px; border-radius:99px; margin-left:4px; vertical-align:middle;">Current</span>' : '');
+
+  const expenses = STATE.budget.expenses.filter(e => e.date && e.date.substring(0, 7) === window.currentBudgetMonth);
   const total = expenses.reduce((s,e)=>s+parseFloat(e.amount||0),0);
   const limit = parseFloat(STATE.budget.limit||0);
   const remaining = limit - total;
   const pct = limit > 0 ? Math.min(100, Math.round(total/limit*100)) : 0;
+  
   document.getElementById('budgetLimit').textContent = `₹${limit.toFixed(2)}`;
   document.getElementById('budgetSpent').textContent = `₹${total.toFixed(2)}`;
   document.getElementById('budgetRemaining').textContent = `₹${remaining.toFixed(2)}`;
   document.getElementById('budgetRemaining').className = `budget-value ${remaining>=0?'green':'red'}`;
   document.getElementById('budgetProgressFill').style.width = `${pct}%`;
   document.getElementById('budgetPct').textContent = `${pct}% used`;
+  
   let rows = expenses;
   if (budgetFilter !== 'all') rows = rows.filter(e=>categoryMatch(e.category, budgetFilter));
   rows = rows.sort((a,b)=>b.date.localeCompare(a.date));
   const catEmoji = {Food:'🍔',Study:'📚',Transport:'🚌',Entertainment:'🎮',Other:'📦'};
   const tbody = document.getElementById('budgetTbody');
-  if (!rows.length) { tbody.innerHTML=`<tr class="empty-row"><td colspan="5"><div class="empty-state"><span>💸</span><p>No expenses found.</p></div></td></tr>`; return; }
+  
+  if (!rows.length) { tbody.innerHTML=`<tr class="empty-row"><td colspan="5"><div class="empty-state"><span>💸</span><p>No expenses found for this month.</p></div></td></tr>`; return; }
   tbody.innerHTML = rows.map(e=>{
     let catText = escHtml(e.category);
     let displayCat = catEmoji[e.category] ? `${catEmoji[e.category]} ${catText}` : catText;
-    return `<tr><td>${escHtml(e.desc)}</td><td><span class="tag tag-in-progress">${displayCat}</span></td><td><strong>₹${parseFloat(e.amount).toFixed(2)}</strong></td><td>${formatDate(e.date)}</td><td><button class="icon-btn del" onclick="deleteExpense('${e.id}')">🗑️</button></td></tr>`;
+    return `<tr><td>${escHtml(e.desc)}</td><td><span class="tag tag-in-progress">${displayCat}</span></td><td><strong>₹${parseFloat(e.amount).toFixed(2)}</strong></td><td>${formatDate(e.date)}</td><td><div class="table-actions"><button class="icon-btn" onclick="editExpense('${e.id}')">✏️</button><button class="icon-btn del" onclick="deleteExpense('${e.id}')">🗑️</button></div></td></tr>`;
   }).join('');
 }
 function deleteExpense(id) { STATE.budget.expenses=STATE.budget.expenses.filter(e=>e.id!==id); save(); renderBudget(); showToast('Removed','info'); }
-function buildExpenseForm() {
-  const catOpts = STATE.categories.budget.map(c => `<option value="${escHtml(c)}">${escHtml(c)}</option>`).join('');
+function editExpense(id) { const e = STATE.budget.expenses.find(x=>x.id===id); openModal('Edit Expense', buildExpenseForm(e)); }
+function buildExpenseForm(e = {}) {
+  const catOpts = STATE.categories.budget.map(c => `<option value="${escHtml(c)}" ${e.category===c?'selected':''}>${escHtml(c)}</option>`).join('');
   return `
-    <div class="form-group"><label class="form-label">Description *</label><input class="form-input" id="f_desc" placeholder="What did you spend on?"/></div>
+    <div class="form-group"><label class="form-label">Description *</label><input class="form-input" id="f_desc" value="${escHtml(e.desc||'')}" placeholder="What did you spend on?"/></div>
     <div class="form-row">
-      <div class="form-group"><label class="form-label">Amount (₹) *</label><input class="form-input" type="number" step="0.01" min="0" id="f_amount" placeholder="0.00"/></div>
+      <div class="form-group"><label class="form-label">Amount (₹) *</label><input class="form-input" type="number" step="0.01" min="0" id="f_amount" value="${e.amount||''}" placeholder="0.00"/></div>
       <div class="form-group"><label class="form-label">Category</label><select class="form-select" id="f_cat">${catOpts}</select></div>
     </div>
-    <div class="form-group"><label class="form-label">Date</label><input class="form-input" type="date" id="f_date" value="${today()}"/></div>
-    <div class="form-actions"><button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="saveExpense()">Add Expense</button></div>`;
+    <div class="form-group"><label class="form-label">Date</label><input class="form-input" type="date" id="f_date" value="${e.date||today()}"/></div>
+    <div class="form-actions"><button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="saveExpense('${e.id||''}')">Save Expense</button></div>`;
 }
-function saveExpense() {
+function saveExpense(id = '') {
   const desc=document.getElementById('f_desc')?.value?.trim(), amount=parseFloat(document.getElementById('f_amount')?.value);
   if (!desc||isNaN(amount)||amount<=0) { showToast('Description & valid amount required','error'); return; }
-  STATE.budget.expenses.push({id:genId(),desc,amount:amount.toFixed(2),category:document.getElementById('f_cat')?.value||'Other',date:document.getElementById('f_date')?.value||today()});
-  save(); closeModal(); renderBudget(); showToast('Expense added!','success');
+  const data = {id:id||genId(),desc,amount:amount.toFixed(2),category:document.getElementById('f_cat')?.value||'Other',date:document.getElementById('f_date')?.value||today()};
+  if (id) { const idx = STATE.budget.expenses.findIndex(e=>e.id===id); if(idx>=0) STATE.budget.expenses[idx]=data; } else STATE.budget.expenses.push(data);
+  save(); closeModal(); renderBudget(); renderDashboard(); showToast(id?'Updated!':'Expense added!','success');
 }
 function buildBudgetLimitForm() {
   return `<div class="form-group"><label class="form-label">Monthly Budget (₹)</label><input class="form-input" type="number" step="100" min="0" id="f_limit" placeholder="e.g. 15000" value="${STATE.budget.limit||''}"/></div>
@@ -1583,8 +1599,50 @@ function buildBudgetLimitForm() {
 }
 function saveBudgetLimit() {
   const val=parseFloat(document.getElementById('f_limit')?.value);
-  if (!isNaN(val)&&val>=0) { STATE.budget.limit=val; save(); closeModal(); renderBudget(); showToast('Budget set!','success'); }
+  if (!isNaN(val)&&val>=0) { STATE.budget.limit=val; save(); closeModal(); renderBudget(); renderDashboard(); showToast('Budget set!','success'); }
   else showToast('Enter valid amount','error');
+}
+
+function openBudgetHistoryModal() {
+  const months = [...new Set(STATE.budget.expenses.map(e => e.date?.substring(0, 7)).filter(Boolean))];
+  const curr = today().substring(0, 7);
+  if (!months.includes(curr)) months.push(curr);
+  months.sort((a,b)=>b.localeCompare(a));
+  
+  const limit = parseFloat(STATE.budget.limit||0);
+  
+  const html = `
+    <div style="display:flex; flex-direction:column; gap:8px; max-height: 400px; overflow-y:auto;">
+      ${months.map(m => {
+        const exs = STATE.budget.expenses.filter(e => e.date?.substring(0, 7) === m);
+        const spent = exs.reduce((s,e)=>s+parseFloat(e.amount||0),0);
+        const pct = limit > 0 ? Math.round(spent/limit*100) : 0;
+        const monthName = new Date(m + '-01').toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
+        const isCurrent = m === curr;
+        return `
+          <div class="note-card" style="min-height:auto; padding:12px 16px; cursor:pointer;" onclick="setBudgetMonth('${m}')">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <span style="font-weight:700;">${monthName} ${isCurrent ? '<span class="tag tag-done" style="margin-left:8px; font-size:10px; padding:2px 6px;">Current</span>' : ''}</span>
+              <span style="font-size:14px; font-weight:600; color: ${spent>limit?'var(--red)':'var(--green)'}">₹${spent.toFixed(2)}</span>
+            </div>
+            <div style="margin-top:8px; display:flex; align-items:center; gap:12px;">
+              <div class="budget-progress-wrap" style="flex:1; margin:0; height:6px;">
+                <div class="budget-progress-fill" style="width:${Math.min(100, pct)}%; background: ${spent>limit?'var(--red)':'var(--green)'}"></div>
+              </div>
+              <span style="font-size:11px; color:var(--text-muted);">${pct}% used</span>
+            </div>
+          </div>
+        `;
+      }).join('')}
+    </div>
+  `;
+  openModal('📅 Past Months', html);
+}
+
+function setBudgetMonth(month) {
+  window.currentBudgetMonth = month;
+  closeModal();
+  renderBudget();
 }
 
 // ==================== NOTES ====================
@@ -2151,6 +2209,7 @@ function init() {
   // Budget
   document.getElementById('addExpenseBtn').addEventListener('click',()=>openModal('Add Expense',buildExpenseForm(),()=>saveExpense()));
   document.getElementById('setBudgetBtn').addEventListener('click',()=>openModal('Set Monthly Budget',buildBudgetLimitForm(),()=>saveBudgetLimit()));
+  document.getElementById('viewPastMonthsBtn')?.addEventListener('click', openBudgetHistoryModal);
   document.getElementById('budgetFilterGroup').addEventListener('click',e=>{
     const btn=e.target.closest('.filter-btn[data-budget-filter]'); if (!btn) return;
     document.querySelectorAll('#budgetFilterGroup .filter-btn').forEach(b=>b.classList.remove('active'));
