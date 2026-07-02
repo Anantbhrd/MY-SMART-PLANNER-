@@ -319,7 +319,10 @@ input, select, textarea { font-family: var(--font); }
 .full-empty { width: 100%; }
 
 /* --- EXAM CARDS --- */
-.exam-cards-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px; }
+.exam-cards-grid { display: grid; gap: 16px; grid-template-columns: repeat(1, 1fr); }
+@media (min-width: 640px) { .exam-cards-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (min-width: 960px) { .exam-cards-grid { grid-template-columns: repeat(3, 1fr); } }
+@media (min-width: 1280px) { .exam-cards-grid { grid-template-columns: repeat(4, 1fr); } }
 .exam-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 20px; display: flex; flex-direction: column; gap: 12px; transition: var(--transition); }
 .exam-card:hover { transform: translateY(-2px); box-shadow: var(--shadow); }
 .exam-card-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
@@ -333,7 +336,10 @@ input, select, textarea { font-family: var(--font); }
 .exam-card-actions { display: flex; gap: 6px; margin-top: 4px; }
 
 /* --- COURSES GRID --- */
-.courses-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px; }
+.courses-grid { display: grid; gap: 16px; grid-template-columns: repeat(1, 1fr); }
+@media (min-width: 640px) { .courses-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (min-width: 960px) { .courses-grid { grid-template-columns: repeat(3, 1fr); } }
+@media (min-width: 1280px) { .courses-grid { grid-template-columns: repeat(4, 1fr); } }
 .course-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 20px; display: flex; flex-direction: column; gap: 10px; transition: var(--transition); position: relative; overflow: hidden; }
 .course-card:hover { transform: translateY(-2px); box-shadow: var(--shadow); }
 .course-card-name { font-size: 16px; font-weight: 700; }
