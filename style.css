@@ -342,7 +342,7 @@ input, select, textarea { font-family: var(--font); }
 .course-stat { text-align: center; }
 .course-stat-val { font-size: 18px; font-weight: 700; }
 .course-stat-label { font-size: 10px; color: var(--text-muted); }
-.course-card-actions { display: flex; gap: 6px; }
+.course-card-actions { display: flex; gap: 6px; flex-wrap: wrap; }
 
 /* --- WEEKLY PLANNER --- */
 .week-nav { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }

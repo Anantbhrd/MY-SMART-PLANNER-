@@ -740,6 +740,10 @@ function renderCourses() {
   let activeCourses = STATE.courses.filter(c => c.status !== 'completed');
   let completedCourses = STATE.courses.filter(c => c.status === 'completed');
 
+  // Sort courses by code (indexing)
+  activeCourses.sort((a,b) => (a.code||'').localeCompare(b.code||''));
+  completedCourses.sort((a,b) => (a.code||'').localeCompare(b.code||''));
+
   if (courseFilter === 'active') { completedCourses = []; }
   if (courseFilter === 'completed') { activeCourses = []; }
 
@@ -2411,6 +2415,17 @@ function init() {
 
   // Courses
   document.getElementById('addCourseBtn').addEventListener('click',()=>openModal('Add Course',buildCourseForm(),()=>saveCourse('')));
+  const cfg = document.getElementById('courseFilterGroup');
+  if (cfg) {
+    cfg.addEventListener('click', e => {
+      const btn = e.target.closest('.filter-btn');
+      if (!btn || !btn.dataset.courseFilter) return;
+      document.querySelectorAll('#courseFilterGroup .filter-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      courseFilter = btn.dataset.courseFilter;
+      renderCourses();
+    });
+  }
 
   // Planner
   document.getElementById('prevWeek').addEventListener('click',()=>{STATE.weekOffset--; renderPlanner();});
