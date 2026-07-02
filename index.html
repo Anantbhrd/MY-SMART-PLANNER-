@@ -507,14 +507,38 @@
     <section class="view" id="view-notes">
       <div class="page-header">
         <h1>🗒️ Notes</h1>
-        <p class="page-sub">Quick notes, study reminders, and ideas.</p>
+        <p class="page-sub">Quick notes, study reminders, ideas, and photos.</p>
       </div>
-      <div class="filter-bar">
-        <input type="text" class="search-bar" placeholder="Search notes..." id="notesSearch" />
-        <button class="btn btn-primary" id="addNoteBtn">+ New Note</button>
+
+      <!-- Sub-tabs -->
+      <div class="sub-tabs" id="notesSubTabs">
+        <button class="sub-tab active" data-subtab="notes-text">📝 Notes</button>
+        <button class="sub-tab" data-subtab="notes-photos">📸 Photos</button>
       </div>
-      <div class="notes-grid" id="notesGrid">
-        <div class="empty-state full-empty"><span>📭</span><p>No notes yet. Create your first note!</p></div>
+
+      <!-- TEXT NOTES SUB-TAB -->
+      <div class="subtab-panel active" id="subtab-notes-text">
+        <div class="filter-bar">
+          <input type="text" class="search-bar" placeholder="Search notes..." id="notesSearch" />
+          <button class="btn btn-primary" id="addNoteBtn">+ New Note</button>
+        </div>
+        <div class="notes-grid" id="notesGrid">
+          <div class="empty-state full-empty"><span>📭</span><p>No notes yet. Create your first note!</p></div>
+        </div>
+      </div>
+
+      <!-- PHOTOS SUB-TAB -->
+      <div class="subtab-panel" id="subtab-notes-photos">
+        <div class="filter-bar">
+          <input type="text" class="search-bar" placeholder="Search photos..." id="photosSearch" />
+          <label class="btn btn-primary" style="cursor: pointer; display: inline-block;">
+            + Upload Photo
+            <input type="file" id="uploadPhotoInput" accept="image/*" style="display: none;" onchange="handlePhotoUploadEvent(event)" />
+          </label>
+        </div>
+        <div class="photos-grid" id="photosGrid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px; margin-top: 16px;">
+          <div class="empty-state full-empty" style="grid-column: 1 / -1;"><span>📸</span><p>No photos yet. Upload your first photo!</p></div>
+        </div>
       </div>
     </section>
 
@@ -539,6 +563,14 @@
       <p id="reminderModalText" style="color: var(--text-secondary); margin-bottom: 16px; font-size: 15px;"></p>
       <div id="reminderTimestamp" style="font-size: 12px; color: var(--accent); background: var(--accent-glow); padding: 4px 12px; border-radius: 12px; display: inline-block; margin-bottom: 24px; font-weight: 600;"></div>
       <button class="btn btn-primary" onclick="document.getElementById('reminderOverlay').classList.remove('open')" style="width: 100%; font-size: 16px; padding: 12px; border-radius: 12px;">Got it!</button>
+    </div>
+  </div>
+
+  <!-- IMAGE VIEWER OVERLAY -->
+  <div class="modal-overlay" id="imageViewerOverlay" style="z-index: 10000;" onclick="closeImageViewer()">
+    <div style="position: relative; width: 90%; max-width: 800px; max-height: 90vh; margin: auto; display: flex; justify-content: center; align-items: center; background: transparent;" onclick="event.stopPropagation()">
+      <img id="viewerImage" src="" style="max-width: 100%; max-height: 90vh; object-fit: contain; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.5);" />
+      <button onclick="closeImageViewer()" style="position: absolute; top: -40px; right: 0; background: none; border: none; color: white; font-size: 30px; cursor: pointer;">✕</button>
     </div>
   </div>
 

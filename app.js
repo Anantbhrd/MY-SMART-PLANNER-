@@ -15,6 +15,8 @@ const STATE = {
   habitLogs: {},
   budget: { limit: 0, expenses: [] },
   notes: [],
+  photos: [],
+  notesSubTab: 'notes-text',
   categories: {
     budget: ['Food', 'Study', 'Transport', 'Entertainment', 'Other'],
     machines: ['Strength', 'Cardio', 'Flexibility', 'Free Weights', 'Other']
@@ -99,6 +101,7 @@ function load() {
       STATE.todos = d.todos || [];
       STATE.completedExams = d.completedExams || [];
       STATE.completedAssignments = d.completedAssignments || [];
+      STATE.photos = d.photos || [];
       if (d.lastTodoResetDate) STATE.lastTodoResetDate = d.lastTodoResetDate;
       if (d.todoNotificationInterval) STATE.todoNotificationInterval = d.todoNotificationInterval;
       if (d.dashboardTiles) STATE.dashboardTiles = d.dashboardTiles;
@@ -278,7 +281,7 @@ function renderView(view) {
     case 'habits': renderHabits(); break;
     case 'workout': renderWorkout(); break;
     case 'budget': renderBudget(); break;
-    case 'notes': renderNotes(); break;
+    case 'notes': setNotesSubTab(STATE.notesSubTab || 'notes-text'); break;
     case 'completed': renderCompleted(); break;
   }
 }
@@ -1695,6 +1698,119 @@ async function handleSaveNote(id) {
   }
 }
 
+function setNotesSubTab(tab) {
+  STATE.notesSubTab = tab;
+  document.querySelectorAll('#notesSubTabs .sub-tab').forEach(b => b.classList.toggle('active', b.dataset.subtab === tab));
+  document.getElementById('subtab-notes-text')?.classList.toggle('active', tab === 'notes-text');
+  document.getElementById('subtab-notes-photos')?.classList.toggle('active', tab === 'notes-photos');
+  if (tab === 'notes-photos') renderPhotos(document.getElementById('photosSearch')?.value || '');
+  else renderNotes(document.getElementById('notesSearch')?.value || '');
+}
+
+function renderPhotos(search='') {
+  const grid = document.getElementById('photosGrid');
+  if (!grid) return;
+  let photos = STATE.photos || [];
+  if (search) photos = photos.filter(p => p.name.toLowerCase().includes(search.toLowerCase()));
+  photos = photos.sort((a,b) => (b.date||'').localeCompare(a.date||''));
+  
+  if (!photos.length) {
+    grid.innerHTML = `<div class="empty-state full-empty" style="grid-column: 1 / -1;"><span>📸</span><p>${search?'No matching photos.':'No photos yet. Upload your first photo!'}</p></div>`;
+    return;
+  }
+  
+  grid.innerHTML = photos.map(p => `
+    <div class="note-card" style="padding: 8px; cursor: pointer; display: flex; flex-direction: column; gap: 8px;" onclick="openImageViewer('${escHtml(p.url)}')">
+      <div style="width: 100%; height: 120px; border-radius: 6px; overflow: hidden; background: var(--bg-tertiary); display: flex; justify-content: center; align-items: center;">
+        <img src="${escHtml(p.url)}" style="width: 100%; height: 100%; object-fit: cover;" alt="${escHtml(p.name)}" loading="lazy" />
+      </div>
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <div style="font-size: 12px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 120px;" title="${escHtml(p.name)}">${escHtml(p.name)}</div>
+        <div style="display:flex; gap:4px;">
+          <button class="icon-btn" onclick="event.stopPropagation(); renamePhoto('${p.id}')" style="padding: 2px;">✏️</button>
+          <button class="icon-btn del" onclick="event.stopPropagation(); deletePhoto('${p.id}')" style="padding: 2px;">🗑️</button>
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function deletePhoto(id) {
+  STATE.photos = STATE.photos.filter(x => x.id !== id);
+  save(); renderPhotos(); showToast('Photo deleted', 'info');
+}
+
+function renamePhoto(id) {
+  const p = STATE.photos.find(x => x.id === id);
+  if (!p) return;
+  openModal('Rename Photo', `
+    <div class="form-group">
+      <label class="form-label">Photo Name</label>
+      <input type="text" class="form-input" id="f_photoName" value="${escHtml(p.name)}" />
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="savePhotoName('${p.id}')">Save</button>
+    </div>
+  `);
+}
+
+function savePhotoName(id) {
+  const p = STATE.photos.find(x => x.id === id);
+  if (!p) return;
+  const newName = document.getElementById('f_photoName')?.value?.trim();
+  if (newName) {
+    p.name = newName;
+    save();
+    renderPhotos(document.getElementById('photosSearch')?.value || '');
+    closeModal();
+    showToast('Photo renamed!', 'success');
+  } else {
+    showToast('Name cannot be empty', 'error');
+  }
+}
+
+async function handlePhotoUploadEvent(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  
+  // Clear input
+  e.target.value = '';
+  
+  try {
+    showToast('Uploading photo...', 'info');
+    let url = "";
+    if (currentUser) {
+      url = await uploadFile(file);
+    } else {
+      // Local object URL fallback
+      url = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = ev => resolve(ev.target.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+    }
+    if (!STATE.photos) STATE.photos = [];
+    STATE.photos.push({ id: genId(), url: url, name: file.name, date: new Date().toISOString() });
+    save();
+    if (STATE.notesSubTab === 'notes-photos') renderPhotos();
+    showToast('Photo uploaded successfully!', 'success');
+  } catch (err) {
+    showToast('Upload failed: ' + err.message, 'error');
+  }
+}
+
+function openImageViewer(url) {
+  document.getElementById('viewerImage').src = url;
+  document.getElementById('imageViewerOverlay').classList.add('open');
+}
+
+function closeImageViewer() {
+  document.getElementById('imageViewerOverlay').classList.remove('open');
+  document.getElementById('viewerImage').src = '';
+}
+
 
 function restoreAssignment(id) {
   const idx = STATE.completedAssignments.findIndex(a => a.id === id);
@@ -2217,8 +2333,13 @@ function init() {
   });
 
   // Notes
+  document.getElementById('notesSubTabs')?.addEventListener('click',e=>{
+    const btn=e.target.closest('.sub-tab'); if (!btn) return;
+    setNotesSubTab(btn.dataset.subtab);
+  });
   document.getElementById('addNoteBtn').addEventListener('click',()=>openModal('New Note',buildNoteForm(),()=>saveNote('')));
   document.getElementById('notesSearch').addEventListener('input',e=>renderNotes(e.target.value));
+  document.getElementById('photosSearch')?.addEventListener('input',e=>renderPhotos(e.target.value));
 
   // Export / Import
   document.getElementById('exportDataBtn')?.addEventListener('click', exportData);
