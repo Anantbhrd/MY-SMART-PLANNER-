@@ -829,7 +829,7 @@ function renderSyllabusItems(c) {
             <option value="hard" ${s.difficulty==='hard'?'selected':''}>Hard</option>
           </select>
         </td>
-        <td><div class="syl-done-btn ${s.done?'on':''}" onclick="toggleSyl('${c.id}','${s.id}','done')" title="${s.done?'Mark Incomplete':'Mark Complete'}"></div></td>
+        <td><div class="syl-done-btn ${s.done?'on':''}" onclick="toggleSyl('${c.id}','${s.id}','done')" title="${s.done?'Mark Incomplete':'Mark Complete'}">✓</div></td>
         <td>
           <div class="syl-actions">
             <button class="icon-btn" onclick="editSyllabusItem('${c.id}','${s.id}')" title="Edit">✏️</button>
