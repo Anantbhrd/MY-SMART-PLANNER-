@@ -822,8 +822,14 @@ function renderSyllabusItems(c) {
         <td><div class="syl-pill theory ${s.theory?'on':''}" onclick="toggleSyl('${c.id}','${s.id}','theory')">✓</div></td>
         <td><div class="syl-pill pyq ${s.pyq?'on':''}" onclick="toggleSyl('${c.id}','${s.id}','pyq')">✓</div></td>
         <td><div class="syl-pill revision ${s.revision?'on':''}" onclick="toggleSyl('${c.id}','${s.id}','revision')">✓</div></td>
-        <td><span class="syl-diff-badge ${s.difficulty}" onclick="updateSyllabusItem('${c.id}','${s.id}','difficulty','${nextDiff}')">${s.difficulty.charAt(0).toUpperCase()+s.difficulty.slice(1)}</span></td>
-        <td><div class="syl-done-btn ${s.done?'on':''}" onclick="toggleSyl('${c.id}','${s.id}','done')" title="${s.done?'Mark Incomplete':'Mark Complete'}">✓</div></td>
+        <td>
+          <select class="syl-diff-select diff-${s.difficulty}" onchange="updateSyllabusItem('${c.id}', '${s.id}', 'difficulty', this.value)">
+            <option value="easy" ${s.difficulty==='easy'?'selected':''}>Easy</option>
+            <option value="medium" ${s.difficulty==='medium'?'selected':''}>Medium</option>
+            <option value="hard" ${s.difficulty==='hard'?'selected':''}>Hard</option>
+          </select>
+        </td>
+        <td><div class="syl-done-btn ${s.done?'on':''}" onclick="toggleSyl('${c.id}','${s.id}','done')" title="${s.done?'Mark Incomplete':'Mark Complete'}"></div></td>
         <td>
           <div class="syl-actions">
             <button class="icon-btn" onclick="editSyllabusItem('${c.id}','${s.id}')" title="Edit">✏️</button>

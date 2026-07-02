@@ -774,7 +774,7 @@ input, select, textarea { font-family: var(--font); }
   background: var(--bg-secondary);
 }
 .syl-tracker-table th {
-  padding: 10px 12px;
+  padding: 10px 16px;
   font-size: 10px;
   font-weight: 700;
   text-transform: uppercase;
@@ -785,15 +785,15 @@ input, select, textarea { font-family: var(--font); }
 }
 .syl-tracker-table th.syl-th-topic {
   text-align: left;
-  padding-left: 16px;
-  min-width: 180px;
+  padding-left: 20px;
+  min-width: 200px;
 }
 .syl-tracker-table th.syl-th-theory { color: var(--blue); }
 .syl-tracker-table th.syl-th-pyq    { color: var(--orange); }
 .syl-tracker-table th.syl-th-rev    { color: var(--green); }
 
 .syl-tracker-table td {
-  padding: 10px 12px;
+  padding: 12px 16px;
   text-align: center;
   border-bottom: 1px solid var(--border-light);
   vertical-align: middle;
@@ -805,7 +805,7 @@ input, select, textarea { font-family: var(--font); }
 
 .syl-td-topic {
   text-align: left !important;
-  padding-left: 16px !important;
+  padding-left: 20px !important;
 }
 .syl-topic-name {
   font-size: 13px;
@@ -828,36 +828,33 @@ input, select, textarea { font-family: var(--font); }
   width: 140px;
 }
 
-/* Pill-style check box for theory/pyq/revision */
+/* Pill-style check box matching habit tracker */
 .syl-pill {
-  width: 28px;
-  height: 28px;
-  border-radius: 8px;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-sm);
   border: 2px solid var(--border);
   cursor: pointer;
   margin: 0 auto;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.18s ease;
-  font-size: 13px;
-  font-weight: 900;
+  transition: var(--transition);
+  font-size: 14px;
+  font-weight: 800;
   color: transparent;
   user-select: none;
 }
-.syl-pill:hover:not(.on) { background: var(--bg-hover); transform: scale(1.08); }
-.syl-pill.on { color: #fff; transform: scale(1.05); }
+.syl-pill:hover:not(.on) { border-color: var(--accent); background: var(--accent-glow); }
+.syl-pill.on { color: #fff; border-color: transparent; }
 .syl-pill.theory.on  { background: var(--blue);   border-color: var(--blue); }
 .syl-pill.pyq.on     { background: var(--orange); border-color: var(--orange); }
 .syl-pill.revision.on { background: var(--green);  border-color: var(--green); }
-.syl-pill.theory:hover:not(.on)   { border-color: var(--blue); }
-.syl-pill.pyq:hover:not(.on)      { border-color: var(--orange); }
-.syl-pill.revision:hover:not(.on) { border-color: var(--green); }
 
 /* Done toggle */
 .syl-done-btn {
-  width: 28px;
-  height: 28px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
   border: 2px solid var(--border);
   cursor: pointer;
@@ -865,7 +862,7 @@ input, select, textarea { font-family: var(--font); }
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 900;
   color: transparent;
   transition: all 0.18s ease;
@@ -874,21 +871,26 @@ input, select, textarea { font-family: var(--font); }
 .syl-done-btn:hover:not(.on) { border-color: var(--accent); background: var(--accent-glow); }
 .syl-done-btn.on { background: var(--accent); border-color: var(--accent); color: #fff; }
 
-/* Difficulty badge */
-.syl-diff-badge {
-  display: inline-block;
-  padding: 3px 10px;
+/* Difficulty Dropdown */
+.syl-diff-select {
+  appearance: none;
+  -webkit-appearance: none;
+  border: 1px solid var(--border);
   border-radius: 99px;
-  font-size: 10.5px;
+  padding: 4px 12px;
+  font-size: 11px;
   font-weight: 700;
   cursor: pointer;
-  border: 1px solid transparent;
+  outline: none;
+  text-align: center;
+  text-align-last: center;
   transition: var(--transition);
-  user-select: none;
 }
-.syl-diff-badge.easy   { color: var(--green);  border-color: var(--green);  background: var(--green-bg); }
-.syl-diff-badge.medium { color: var(--yellow); border-color: var(--yellow); background: var(--yellow-bg); }
-.syl-diff-badge.hard   { color: var(--red);    border-color: var(--red);    background: var(--red-bg); }
+.syl-diff-select.diff-easy { color: var(--green); border-color: var(--green); background: var(--green-bg); }
+.syl-diff-select.diff-medium { color: var(--yellow); border-color: var(--yellow); background: var(--yellow-bg); }
+.syl-diff-select.diff-hard { color: var(--red); border-color: var(--red); background: var(--red-bg); }
+
+
 
 .syl-actions {
   display: flex;
