@@ -733,12 +733,12 @@ function renderCourses() {
   grid.innerHTML=STATE.courses.map(c=>{
     const ta=STATE.assignments.filter(a=>a.course===c.name).length;
     const da=STATE.assignments.filter(a=>a.course===c.name&&a.status==='done').length;
-    return `<div class="course-card" style="border-top:3px solid ${c.color}">
+    return `<div class="course-card" style="border-top:3px solid ${c.color}; cursor:pointer;" onclick="openSyllabus('${c.id}')">
       <div class="course-code">${escHtml(c.code||'')}</div>
       <div class="course-name">${escHtml(c.name)}</div>
       <div class="course-prof">${escHtml(c.prof||'')}</div>
-      ${c.attachment ? `<div style="margin-top:8px;"><a href="${escHtml(c.attachment)}" target="_blank" style="font-size:12px; color:var(--accent);">🔗 View Material</a></div>` : ''}
-      <div class="course-card-stats"><div class="course-stat"><div class="course-stat-val" style="color:${c.color}">${ta}</div><div class="course-stat-label">Tasks</div></div><div class="course-stat"><div class="course-stat-val" style="color:var(--green)">${da}</div><div class="course-stat-label">Done</div></div>${c.grade?`<div class="course-stat"><div class="course-stat-val">${escHtml(c.grade)}</div><div class="course-stat-label">Grade</div></div>`:''}</div><div class="course-card-actions"><button class="btn btn-sm btn-outline" onclick="editCourse('${c.id}')">✏️ Edit</button><button class="btn btn-sm btn-danger" onclick="deleteCourse('${c.id}')">🗑️ Delete</button></div></div>`;
+      ${c.attachment ? `<div style="margin-top:8px;"><a href="${escHtml(c.attachment)}" target="_blank" onclick="event.stopPropagation()" style="font-size:12px; color:var(--accent);">🔗 View Material</a></div>` : ''}
+      <div class="course-card-stats"><div class="course-stat"><div class="course-stat-val" style="color:${c.color}">${ta}</div><div class="course-stat-label">Tasks</div></div><div class="course-stat"><div class="course-stat-val" style="color:var(--green)">${da}</div><div class="course-stat-label">Done</div></div>${c.grade?`<div class="course-stat"><div class="course-stat-val">${escHtml(c.grade)}</div><div class="course-stat-label">Grade</div></div>`:''}</div><div class="course-card-actions"><button class="btn btn-sm btn-outline" onclick="event.stopPropagation(); editCourse('${c.id}')">✏️ Edit</button><button class="btn btn-sm btn-danger" onclick="event.stopPropagation(); deleteCourse('${c.id}')">🗑️ Delete</button></div></div>`;
   }).join('');
 }
 function deleteCourse(id) { STATE.courses=STATE.courses.filter(c=>c.id!==id); save(); renderCourses(); showToast('Deleted','info'); }
@@ -776,6 +776,154 @@ async function handleSaveCourse(id) {
     showToast('Failed: ' + e.message, 'error');
     btn.disabled = false; btn.textContent = "Save Course";
   }
+}
+
+// ==================== SYLLABUS ====================
+function openSyllabus(id) {
+  const c = STATE.courses.find(x => x.id === id);
+  if(!c) return;
+  if(!c.syllabus) c.syllabus = [];
+  openModal(`📚 Syllabus — ${escHtml(c.name)}`, buildSyllabusModal(c));
+}
+
+function buildSyllabusModal(c) {
+  const total = c.syllabus.length;
+  const done = c.syllabus.filter(s => s.done).length;
+  const pct = total ? Math.round((done / total) * 100) : 0;
+  return `
+    <div class="syl-header">
+      <div style="display:flex; align-items:center; gap:10px; flex:1; min-width:0;">
+        <div class="syl-progress-bar-wrap"><div class="syl-progress-bar" style="width:${pct}%"></div></div>
+        <span class="syl-progress-label">${done}/${total} Done</span>
+      </div>
+      <button class="btn btn-primary btn-sm" onclick="addSyllabusItem('${c.id}')">+ Add Topic</button>
+    </div>
+    <div id="syllabusList">
+      ${renderSyllabusItems(c)}
+    </div>
+  `;
+}
+
+function renderSyllabusItems(c) {
+  if(!c.syllabus || c.syllabus.length === 0) {
+    return `<div class="empty-state"><span>📚</span><p>No topics yet — add one above!</p></div>`;
+  }
+
+  const rows = c.syllabus.map(s => {
+    const diffs = ['easy','medium','hard'];
+    const nextDiff = diffs[(diffs.indexOf(s.difficulty)+1) % 3];
+    const topicCell = s._editing
+      ? `<div class="syl-topic-name"><input class="syl-edit-input" id="editInput_${s.id}" value="${escHtml(s.topic||'')}" onkeydown="if(event.key==='Enter')saveSyllabusTopicEdit('${c.id}','${s.id}')" placeholder="Topic name..." /><button class="icon-btn" onclick="saveSyllabusTopicEdit('${c.id}','${s.id}')">✔️</button></div>`
+      : `<div class="syl-topic-name"><span>${escHtml(s.topic||'Untitled')}</span></div>`;
+
+    return `
+      <tr class="${s.done?'syl-row-done':''}">
+        <td class="syl-td-topic">${topicCell}</td>
+        <td><div class="syl-pill theory ${s.theory?'on':''}" onclick="toggleSyl('${c.id}','${s.id}','theory')">✓</div></td>
+        <td><div class="syl-pill pyq ${s.pyq?'on':''}" onclick="toggleSyl('${c.id}','${s.id}','pyq')">✓</div></td>
+        <td><div class="syl-pill revision ${s.revision?'on':''}" onclick="toggleSyl('${c.id}','${s.id}','revision')">✓</div></td>
+        <td><span class="syl-diff-badge ${s.difficulty}" onclick="updateSyllabusItem('${c.id}','${s.id}','difficulty','${nextDiff}')">${s.difficulty.charAt(0).toUpperCase()+s.difficulty.slice(1)}</span></td>
+        <td><div class="syl-done-btn ${s.done?'on':''}" onclick="toggleSyl('${c.id}','${s.id}','done')" title="${s.done?'Mark Incomplete':'Mark Complete'}">✓</div></td>
+        <td>
+          <div class="syl-actions">
+            <button class="icon-btn" onclick="editSyllabusItem('${c.id}','${s.id}')" title="Edit">✏️</button>
+            <button class="icon-btn del" onclick="deleteSyllabusItem('${c.id}','${s.id}')" title="Delete">🗑️</button>
+          </div>
+        </td>
+      </tr>`;
+  }).join('');
+
+  return `
+    <div class="syl-tracker-wrap">
+      <table class="syl-tracker-table">
+        <thead>
+          <tr>
+            <th class="syl-th-topic">Topic</th>
+            <th class="syl-th-theory">Theory</th>
+            <th class="syl-th-pyq">PYQ</th>
+            <th class="syl-th-rev">Revision</th>
+            <th>Difficulty</th>
+            <th>Done</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
+}
+
+function refreshSyllabus(c) {
+  document.getElementById('syllabusList').innerHTML = renderSyllabusItems(c);
+  // refresh progress bar
+  const total = c.syllabus.length;
+  const done = c.syllabus.filter(s => s.done).length;
+  const pct = total ? Math.round((done / total) * 100) : 0;
+  const bar = document.querySelector('.syl-progress-bar');
+  const lbl = document.querySelector('.syl-progress-label');
+  if (bar) bar.style.width = pct + '%';
+  if (lbl) lbl.textContent = `${done}/${total} Done`;
+}
+
+function addSyllabusItem(courseId) {
+  const c = STATE.courses.find(x => x.id === courseId);
+  if(!c) return;
+  if(!c.syllabus) c.syllabus = [];
+  const newItem = { id: genId(), topic: '', theory: false, pyq: false, revision: false, difficulty: 'medium', done: false, _editing: true };
+  c.syllabus.push(newItem);
+  save();
+  refreshSyllabus(c);
+  // focus the new input
+  setTimeout(() => { const el = document.getElementById(`editInput_${newItem.id}`); if(el) el.focus(); }, 50);
+}
+
+function editSyllabusItem(courseId, itemId) {
+  const c = STATE.courses.find(x => x.id === courseId);
+  if(!c) return;
+  const s = c.syllabus.find(x => x.id === itemId);
+  if(!s) return;
+  s._editing = !s._editing;
+  refreshSyllabus(c);
+  if (s._editing) setTimeout(() => { const el = document.getElementById(`editInput_${itemId}`); if(el) { el.focus(); el.select(); } }, 50);
+}
+
+function saveSyllabusTopicEdit(courseId, itemId) {
+  const c = STATE.courses.find(x => x.id === courseId);
+  if(!c) return;
+  const s = c.syllabus.find(x => x.id === itemId);
+  if(!s) return;
+  const el = document.getElementById(`editInput_${itemId}`);
+  if (el) s.topic = el.value.trim();
+  s._editing = false;
+  save();
+  refreshSyllabus(c);
+}
+
+function toggleSyl(courseId, itemId, field) {
+  const c = STATE.courses.find(x => x.id === courseId);
+  if(!c) return;
+  const s = c.syllabus.find(x => x.id === itemId);
+  if(!s) return;
+  s[field] = !s[field];
+  save();
+  refreshSyllabus(c);
+}
+
+function updateSyllabusItem(courseId, itemId, field, value) {
+  const c = STATE.courses.find(x => x.id === courseId);
+  if(!c) return;
+  const s = c.syllabus.find(x => x.id === itemId);
+  if(!s) return;
+  s[field] = value;
+  save();
+  refreshSyllabus(c);
+}
+
+function deleteSyllabusItem(courseId, itemId) {
+  const c = STATE.courses.find(x => x.id === courseId);
+  if(!c) return;
+  c.syllabus = c.syllabus.filter(x => x.id !== itemId);
+  save();
+  document.getElementById('syllabusList').innerHTML = renderSyllabusItems(c);
 }
 // ==================== TO-DO LIST ====================
 function renderTodos() {
