@@ -559,6 +559,7 @@ function saveAssignment(id = '') {
 
 // ==================== EXAMS ====================
 let examFilter = 'all';
+let courseFilter = 'all';
 function renderExams() {
   const externalGrid = document.getElementById('externalExamsGrid');
   const internalGrid = document.getElementById('internalExamsGrid');
@@ -728,18 +729,50 @@ function saveExam(id='') {
 
 // ==================== COURSES ====================
 function renderCourses() {
-  const grid=document.getElementById('coursesGrid');
-  if (!STATE.courses.length) { grid.innerHTML=`<div class="empty-state full-empty"><span>📭</span><p>No courses added yet.</p></div>`; return; }
-  grid.innerHTML=STATE.courses.map(c=>{
-    const ta=STATE.assignments.filter(a=>a.course===c.name).length;
-    const da=STATE.assignments.filter(a=>a.course===c.name&&a.status==='done').length;
-    return `<div class="course-card" style="border-top:3px solid ${c.color}; cursor:pointer;" onclick="openSyllabus('${c.id}')">
-      <div class="course-code">${escHtml(c.code||'')}</div>
-      <div class="course-name">${escHtml(c.name)}</div>
-      <div class="course-prof">${escHtml(c.prof||'')}</div>
-      ${c.attachment ? `<div style="margin-top:8px;"><a href="${escHtml(c.attachment)}" target="_blank" onclick="event.stopPropagation()" style="font-size:12px; color:var(--accent);">🔗 View Material</a></div>` : ''}
-      <div class="course-card-stats"><div class="course-stat"><div class="course-stat-val" style="color:${c.color}">${ta}</div><div class="course-stat-label">Tasks</div></div><div class="course-stat"><div class="course-stat-val" style="color:var(--green)">${da}</div><div class="course-stat-label">Done</div></div>${c.grade?`<div class="course-stat"><div class="course-stat-val">${escHtml(c.grade)}</div><div class="course-stat-label">Grade</div></div>`:''}</div><div class="course-card-actions"><button class="btn btn-sm btn-outline" onclick="event.stopPropagation(); editCourse('${c.id}')">✏️ Edit</button><button class="btn btn-sm btn-danger" onclick="event.stopPropagation(); deleteCourse('${c.id}')">🗑️ Delete</button></div></div>`;
-  }).join('');
+  const activeGrid = document.getElementById('activeCoursesGrid');
+  const completedGrid = document.getElementById('completedCoursesGrid');
+  const activeHeader = document.getElementById('activeCourseHeader');
+  const completedHeader = document.getElementById('completedCourseHeader');
+  if (!activeGrid || !completedGrid) return;
+  
+  activeGrid.innerHTML = ''; completedGrid.innerHTML = '';
+  
+  let activeCourses = STATE.courses.filter(c => c.status !== 'completed');
+  let completedCourses = STATE.courses.filter(c => c.status === 'completed');
+
+  if (courseFilter === 'active') { completedCourses = []; }
+  if (courseFilter === 'completed') { activeCourses = []; }
+
+  activeHeader.style.display = activeCourses.length || courseFilter === 'all' || courseFilter === 'active' ? 'flex' : 'none';
+  completedHeader.style.display = completedCourses.length || courseFilter === 'all' || courseFilter === 'completed' ? 'flex' : 'none';
+  activeGrid.style.display = activeHeader.style.display;
+  completedGrid.style.display = completedHeader.style.display;
+
+  function renderList(list, gridEl, emptyMsg) {
+    if (!list.length) { gridEl.innerHTML=`<div class="empty-state full-empty"><span>📭</span><p>${emptyMsg}</p></div>`; return; }
+    gridEl.innerHTML = list.map(c => {
+      const ta = STATE.assignments.filter(a => a.course === c.name).length;
+      const da = STATE.assignments.filter(a => a.course === c.name && a.status === 'done').length;
+      return `<div class="course-card" style="border-top:3px solid ${c.color}; cursor:pointer;" onclick="openSyllabus('${c.id}')">
+        <div class="course-code">${escHtml(c.code||'')}</div>
+        <div class="course-name">${escHtml(c.name)}</div>
+        <div class="course-prof">${escHtml(c.prof||'')}</div>
+        ${c.attachment ? `<div style="margin-top:8px;"><a href="${escHtml(c.attachment)}" target="_blank" onclick="event.stopPropagation()" style="font-size:12px; color:var(--accent);">📎 View Material</a></div>` : ''}
+        <div class="course-card-stats">
+          <div class="course-stat"><div class="course-stat-val" style="color:${c.color}">${ta}</div><div class="course-stat-label">Tasks</div></div>
+          <div class="course-stat"><div class="course-stat-val" style="color:var(--green)">${da}</div><div class="course-stat-label">Done</div></div>
+          ${c.grade?`<div class="course-stat"><div class="course-stat-val">${escHtml(c.grade)}</div><div class="course-stat-label">Grade</div></div>`:''}
+        </div>
+        <div class="course-card-actions">
+          <button class="btn btn-sm btn-outline" onclick="event.stopPropagation(); editCourse('${c.id}')">✏️ Edit</button>
+          <button class="btn btn-sm btn-danger" onclick="event.stopPropagation(); deleteCourse('${c.id}')">🗑️ Delete</button>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  renderList(activeCourses, activeGrid, 'No active courses.');
+  renderList(completedCourses, completedGrid, 'No completed courses.');
 }
 function deleteCourse(id) { STATE.courses=STATE.courses.filter(c=>c.id!==id); save(); renderCourses(); showToast('Deleted','info'); }
 function editCourse(id) { const c=STATE.courses.find(x=>x.id===id); openModal('Edit Course', buildCourseForm(c)); }
@@ -750,6 +783,13 @@ function buildCourseForm(c={}) {
     <div class="form-group"><label class="form-label">Course Name</label><input type="text" id="f_courseName" class="form-input" value="${escHtml(c.name||'')}" placeholder="e.g. Intro to Computer Science"/></div>
     <div class="form-group"><label class="form-label">Professor/Instructor</label><input type="text" id="f_courseProf" class="form-input" value="${escHtml(c.prof||'')}" placeholder="e.g. Dr. Smith"/></div>
     <div class="form-group"><label class="form-label">Color</label><input type="color" id="f_courseColor" class="form-input" value="${c.color||'#3b82f6'}" style="height:40px;padding:2px;"/></div>
+    <div class="form-group">
+      <label class="form-label">Status</label>
+      <select id="f_courseStatus" class="form-select">
+        <option value="active" ${c.status !== 'completed' ? 'selected' : ''}>Active</option>
+        <option value="completed" ${c.status === 'completed' ? 'selected' : ''}>Completed</option>
+      </select>
+    </div>
     <div class="form-group">
       <label class="form-label">Course Syllabus / Material (PDF)</label>
       <input type="file" id="f_courseFile" accept=".pdf,.ppt,.pptx" class="form-input" style="padding: 6px;" />
@@ -769,8 +809,9 @@ async function handleSaveCourse(id) {
     const name=document.getElementById('f_courseName')?.value||'';
     const prof=document.getElementById('f_courseProf')?.value||'';
     const color=document.getElementById('f_courseColor')?.value||'#3b82f6';
-    if (!id) STATE.courses.push({ id: genId(), code, name, prof, color, attachment });
-    else { const c=STATE.courses.find(x=>x.id===id); if(c) { c.code=code; c.name=name; c.prof=prof; c.color=color; if(attachment) c.attachment=attachment; } }
+    const status=document.getElementById('f_courseStatus')?.value||'active';
+    if (!id) STATE.courses.push({ id: genId(), code, name, prof, color, status, attachment });
+    else { const c=STATE.courses.find(x=>x.id===id); if(c) { c.code=code; c.name=name; c.prof=prof; c.color=color; c.status=status; if(attachment) c.attachment=attachment; } }
     save(); renderCourses(); closeModal(); showToast('Course saved','success');
   } catch(e) {
     showToast('Failed: ' + e.message, 'error');

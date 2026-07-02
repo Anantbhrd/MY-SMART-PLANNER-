@@ -257,11 +257,26 @@
         <p class="page-sub">Manage your courses and track grades.</p>
       </div>
       <div class="filter-bar">
-        <div></div>
+        <div class="filter-group" id="courseFilterGroup">
+          <button class="filter-btn active" data-course-filter="all">All</button>
+          <button class="filter-btn" data-course-filter="active">Active</button>
+          <button class="filter-btn" data-course-filter="completed">Completed</button>
+        </div>
         <button class="btn btn-primary" id="addCourseBtn">+ Add Course</button>
       </div>
-      <div class="courses-grid" id="coursesGrid">
-        <div class="empty-state full-empty"><span>📭</span><p>No courses added yet.</p></div>
+      
+      <h3 id="activeCourseHeader" style="margin-top: 10px; margin-bottom: 10px; color: var(--accent); display: flex; align-items: center; gap: 8px;">
+        📚 Active Courses
+      </h3>
+      <div class="courses-grid" id="activeCoursesGrid" style="margin-bottom: 30px;">
+        <div class="empty-state full-empty"><span>📭</span><p>No active courses.</p></div>
+      </div>
+
+      <h3 id="completedCourseHeader" style="margin-top: 10px; margin-bottom: 10px; color: var(--green); display: flex; align-items: center; gap: 8px;">
+        ✅ Completed Courses
+      </h3>
+      <div class="courses-grid" id="completedCoursesGrid">
+        <div class="empty-state full-empty"><span>📭</span><p>No completed courses.</p></div>
       </div>
     </section>
 
