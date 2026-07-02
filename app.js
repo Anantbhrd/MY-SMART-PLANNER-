@@ -57,7 +57,7 @@ const firebaseConfig = {
   apiKey: "AIzaSyBV909j9ypRynF2ZO7BMXp90r6gPRfGUQk",
   authDomain: "my-study-planner-98e4d.firebaseapp.com",
   projectId: "my-study-planner-98e4d",
-  storageBucket: "my-study-planner-98e4d.firebasestorage.app",
+  storageBucket: "my-study-planner-98e4d.appspot.com",
   messagingSenderId: "848797377236",
   appId: "1:848797377236:web:7d641a2a083594a1bb5141",
   measurementId: "G-BHB986PSP6"
