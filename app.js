@@ -559,7 +559,7 @@ function saveAssignment(id = '') {
 
 // ==================== EXAMS ====================
 let examFilter = 'all';
-let courseFilter = 'all';
+let courseFilter = 'active';
 function renderExams() {
   const externalGrid = document.getElementById('externalExamsGrid');
   const internalGrid = document.getElementById('internalExamsGrid');
