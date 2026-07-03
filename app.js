@@ -782,12 +782,54 @@ function renderCourses() {
 function deleteCourse(id) { STATE.courses=STATE.courses.filter(c=>c.id!==id); save(); renderCourses(); showToast('Deleted','info'); }
 function toggleCourseStatus(id) {
   const c = STATE.courses.find(x => x.id === id);
-  if (c) {
-    c.status = c.status === 'completed' ? 'active' : 'completed';
+  if (!c) return;
+  if (c.status === 'completed') {
+    // Re-open: instant toggle
+    c.status = 'active';
     save();
     renderCourses();
-    showToast(`Course marked as ${c.status}`, 'success');
+    showToast('Course re-opened', 'success');
+  } else {
+    // Complete: open modal to enter grade
+    openModal('🎓 Complete Course', `
+      <div style="text-align:center; margin-bottom:20px;">
+        <div style="font-size:48px; margin-bottom:8px;">🎉</div>
+        <div style="font-size:18px; font-weight:600; color:var(--text-primary);">${escHtml(c.name)}</div>
+        <div style="font-size:13px; color:var(--text-muted); margin-top:4px;">${escHtml(c.code || '')} • ${escHtml(c.prof || '')}</div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">📊 Grade Achieved</label>
+        <select class="form-input" id="f_courseGrade">
+          <option value="">— Select Grade —</option>
+          <option value="O">O (Outstanding)</option>
+          <option value="A+">A+</option>
+          <option value="A">A</option>
+          <option value="B+">B+</option>
+          <option value="B">B</option>
+          <option value="C+">C+</option>
+          <option value="C">C</option>
+          <option value="D">D</option>
+          <option value="F">F (Fail)</option>
+          <option value="P">P (Pass)</option>
+        </select>
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
+        <button class="btn btn-primary" onclick="completeCourse('${c.id}')">Save & Complete</button>
+      </div>
+    `);
   }
+}
+function completeCourse(id) {
+  const c = STATE.courses.find(x => x.id === id);
+  if (!c) return;
+  const grade = document.getElementById('f_courseGrade')?.value || '';
+  c.status = 'completed';
+  c.grade = grade;
+  save();
+  closeModal();
+  renderCourses();
+  showToast(`${c.name} completed! 🎉`, 'success');
 }
 function editCourse(id) { const c=STATE.courses.find(x=>x.id===id); openModal('Edit Course', buildCourseForm(c)); }
 function buildCourseForm(c={}) {
