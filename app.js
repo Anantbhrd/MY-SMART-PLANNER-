@@ -749,8 +749,8 @@ function renderCourses() {
 
   activeHeader.style.display = activeCourses.length || courseFilter === 'all' || courseFilter === 'active' ? 'flex' : 'none';
   completedHeader.style.display = completedCourses.length || courseFilter === 'all' || courseFilter === 'completed' ? 'flex' : 'none';
-  activeGrid.style.display = activeHeader.style.display;
-  completedGrid.style.display = completedHeader.style.display;
+  activeGrid.style.display = activeHeader.style.display === 'none' ? 'none' : 'grid';
+  completedGrid.style.display = completedHeader.style.display === 'none' ? 'none' : 'grid';
 
   function renderList(list, gridEl, emptyMsg) {
     if (!list.length) { gridEl.innerHTML=`<div class="empty-state full-empty"><span>📭</span><p>${emptyMsg}</p></div>`; return; }
@@ -769,6 +769,7 @@ function renderCourses() {
         </div>
         <div class="course-card-actions">
           <button class="btn btn-sm btn-outline" onclick="event.stopPropagation(); editCourse('${c.id}')">✏️ Edit</button>
+          <button class="btn btn-sm btn-outline" onclick="event.stopPropagation(); toggleCourseStatus('${c.id}')">${c.status === 'completed' ? '🔄 Re-open' : '✅ Complete'}</button>
           <button class="btn btn-sm btn-danger" onclick="event.stopPropagation(); deleteCourse('${c.id}')">🗑️ Delete</button>
         </div>
       </div>`;
@@ -779,6 +780,15 @@ function renderCourses() {
   renderList(completedCourses, completedGrid, 'No completed courses.');
 }
 function deleteCourse(id) { STATE.courses=STATE.courses.filter(c=>c.id!==id); save(); renderCourses(); showToast('Deleted','info'); }
+function toggleCourseStatus(id) {
+  const c = STATE.courses.find(x => x.id === id);
+  if (c) {
+    c.status = c.status === 'completed' ? 'active' : 'completed';
+    save();
+    renderCourses();
+    showToast(`Course marked as ${c.status}`, 'success');
+  }
+}
 function editCourse(id) { const c=STATE.courses.find(x=>x.id===id); openModal('Edit Course', buildCourseForm(c)); }
 function buildCourseForm(c={}) {
   const attHtml = c.attachment ? `<div style="margin-top:8px;"><a href="${escHtml(c.attachment)}" target="_blank" style="font-size:12px; color:var(--accent);">🔗 View current attachment</a></div>` : '';
