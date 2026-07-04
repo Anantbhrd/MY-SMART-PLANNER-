@@ -326,26 +326,6 @@ function renderDashboard() {
   const eb = document.getElementById('badge-exams');
   eb.textContent = upcomingExams > 0 ? upcomingExams : ''; eb.style.display = upcomingExams > 0 ? 'block' : 'none';
 
-  // Daily Quote
-  const quotes = [
-    "“The secret of getting ahead is getting started.” – Mark Twain",
-    "“It always seems impossible until it's done.” – Nelson Mandela",
-    "“Don't watch the clock; do what it does. Keep going.” – Sam Levenson",
-    "“The future depends on what you do today.” – Mahatma Gandhi",
-    "“Believe you can and you're halfway there.” – Theodore Roosevelt",
-    "“Success is the sum of small efforts, repeated day-in and day-out.” – Robert Collier",
-    "“You don't have to be great to start, but you have to start to be great.” – Zig Ziglar",
-    "“The expert in anything was once a beginner.” – Helen Hayes",
-    "“Focus on being productive instead of busy.” – Tim Ferriss",
-    "“Push yourself, because no one else is going to do it for you.”"
-  ];
-  const now = new Date();
-  const dayOfYear = Math.floor((now - new Date(now.getFullYear(), 0, 0)) / 1000 / 60 / 60 / 24);
-  const weekOfYear = Math.floor(dayOfYear / 7);
-  const weeklyQuote = quotes[weekOfYear % quotes.length];
-  const qEl = document.getElementById('dailyQuote');
-  if (qEl) qEl.textContent = weeklyQuote;
-
   updateSemesterUI();
 
   // Generate dashboard tiles dynamically
@@ -353,6 +333,33 @@ function renderDashboard() {
   if (dGrid) {
     const visibleTiles = [...STATE.dashboardTiles].filter(t => t.visible).sort((a,b) => a.order - b.order);
     dGrid.innerHTML = visibleTiles.map(t => getTileHTML(t.id)).join('');
+  }
+
+  // Daily Quote
+  const qEl = document.getElementById('dailyQuote');
+  if (qEl) {
+    const td = today();
+    const cachedDate = localStorage.getItem('dailyQuoteDate');
+    const cachedQuote = localStorage.getItem('dailyQuoteText');
+
+    if (cachedDate === td && cachedQuote) {
+      qEl.textContent = cachedQuote;
+    } else {
+      qEl.textContent = "Loading quote...";
+      fetch('https://api.quotable.io/random')
+        .then(res => res.json())
+        .then(data => {
+          const quoteObj = Array.isArray(data) ? data[0] : data;
+          const text = `“${quoteObj.content}” – ${quoteObj.author}`;
+          qEl.textContent = text;
+          localStorage.setItem('dailyQuoteDate', td);
+          localStorage.setItem('dailyQuoteText', text);
+        })
+        .catch(err => {
+          const fallback = "“Push yourself, because no one else is going to do it for you.”";
+          qEl.textContent = fallback;
+        });
+    }
   }
 
   // Deadlines
