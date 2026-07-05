@@ -78,12 +78,13 @@ async function uploadFile(file) {
 
 let currentUser = null;
 let unsubscribeSnapshot = null;
+let isCloudDataLoaded = false;
 
 // ==================== PERSISTENCE ====================
 function save() {
   try { localStorage.setItem('studentPlanner_v3', JSON.stringify(STATE)); } catch(e) {}
-  if (currentUser) {
-    db.collection('users').doc(currentUser.uid).set(STATE)
+  if (currentUser && isCloudDataLoaded) {
+    db.collection('users').doc(currentUser.uid).set(STATE, { merge: true })
       .catch(err => console.error("Firebase save error:", err));
   }
 }
@@ -2337,7 +2338,14 @@ function initAuth() {
       
       if (unsubscribeSnapshot) unsubscribeSnapshot();
       unsubscribeSnapshot = db.collection('users').doc(user.uid).onSnapshot(doc => {
+        console.log(auth.currentUser);
+        console.log(auth.currentUser?.uid);
+        console.log(auth.currentUser?.email);
+        console.log("Current UID:", user.uid);
+        console.log("Reading document:", `users/${user.uid}`);
+        console.log("Document exists:", doc.exists);
         if (doc.exists) {
+          console.log("Document data:", doc.data());
           const d = doc.data();
           if (d.workout) STATE.workout = Object.assign({}, STATE.workout, d.workout);
           if (d.semester) STATE.semester = Object.assign({}, STATE.semester, d.semester);
@@ -2347,14 +2355,19 @@ function initAuth() {
           STATE.semester = d.semester || STATE.semester;
           STATE.categories = d.categories || STATE.categories;
           localStorage.setItem('studentPlanner_v3', JSON.stringify(STATE));
+          isCloudDataLoaded = true;
           renderAll();
         } else {
+          isCloudDataLoaded = true;
           save(); // Push local state up if new cloud doc
           renderAll();
         }
+      }, error => {
+        console.error("Firestore read failed:", error);
       });
     } else {
       currentUser = null;
+      isCloudDataLoaded = false;
       if (!window.isOfflineMode) {
         document.getElementById('loginOverlay').style.display = 'flex';
       }
@@ -2830,4 +2843,42 @@ function saveSemesterStats() {
   closeModal();
 }
 
-document.addEventListener('DOMContentLoaded', init);
+document.addEventListener('DOMContentLoaded', () => {
+  init();
+  
+  const restoreBtn = document.getElementById('restoreDataBtn');
+  if (restoreBtn) {
+    restoreBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      
+      const confirmRestore = confirm("This will attempt to fetch your old data from Firebase. Ensure you have published the Firebase Rules first. Proceed?");
+      if (!confirmRestore) return;
+      
+      db.collection('users').doc('jwmFFeSaHqPSlQiCylPc6j9Fzp53').get().then(doc => {
+        if (doc.exists) {
+          const d = doc.data();
+          
+          if (d.workout) STATE.workout = Object.assign({}, STATE.workout, d.workout);
+          if (d.semester) STATE.semester = Object.assign({}, STATE.semester, d.semester);
+          if (d.categories) STATE.categories = Object.assign({}, STATE.categories, d.categories);
+          Object.assign(STATE, d);
+          STATE.workout = d.workout || STATE.workout;
+          STATE.semester = d.semester || STATE.semester;
+          STATE.categories = d.categories || STATE.categories;
+          
+          localStorage.setItem('studentPlanner_v3', JSON.stringify(STATE));
+          save(); // This saves it to your NEW Firebase account!
+          renderAll();
+          
+          alert("SUCCESS! Your old data has been restored and saved to your new account. You can now revert your Firebase Rules to secure your database.");
+          restoreBtn.style.display = 'none'; // Hide button after success
+        } else {
+          alert("Error: Could not find the old document. Make sure you updated the Firebase Rules.");
+        }
+      }).catch(err => {
+        console.error("Error fetching old data: ", err);
+        alert("Error fetching data. Did you publish the Firebase Rules?");
+      });
+    });
+  }
+});
