@@ -1133,6 +1133,51 @@ function checkTodoNotifications() {
   }
 }
 
+function checkBackupReminder() {
+  const lastBackup = localStorage.getItem('lastBackupDate');
+  const now = Date.now();
+  const tenDaysMs = 10 * 24 * 60 * 60 * 1000;
+  
+  if (!lastBackup || (now - parseInt(lastBackup) >= tenDaysMs)) {
+    const text = `It's been a while since your last backup! It's highly recommended to download a local backup of your data to keep it safe.`;
+    document.getElementById('reminderModalText').textContent = text;
+    // Set timestamp
+    const tsEl = document.getElementById('reminderTimestamp');
+    if (tsEl) {
+      tsEl.textContent = new Date().toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit' }) + ' IST';
+    }
+    
+    // Add a quick backup action button dynamically if it doesn't exist
+    let actionBtn = document.getElementById('quickBackupBtn');
+    if (!actionBtn) {
+      actionBtn = document.createElement('button');
+      actionBtn.id = 'quickBackupBtn';
+      actionBtn.className = 'btn btn-outline';
+      actionBtn.style = 'width: 100%; font-size: 16px; padding: 12px; border-radius: 12px; margin-bottom: 12px;';
+      actionBtn.textContent = '📥 Download Backup Now';
+      actionBtn.onclick = () => {
+        exportData();
+        document.getElementById('reminderOverlay').classList.remove('open');
+      };
+      document.getElementById('reminderModal').insertBefore(actionBtn, document.getElementById('reminderModal').lastElementChild);
+    } else {
+      actionBtn.style.display = 'block';
+    }
+    
+    document.getElementById('reminderOverlay').classList.add('open');
+    const audio = document.getElementById('notificationSound');
+    if (audio) {
+      audio.volume = STATE.notificationVolume !== undefined ? STATE.notificationVolume : 1.0;
+      audio.currentTime = 0;
+      audio.play().catch(e => console.log('Audio play prevented', e));
+    }
+    
+    // Update lastBackupDate so it snoozes for 10 days if they dismiss, 
+    // exportData() will update it again if they click download.
+    localStorage.setItem('lastBackupDate', now.toString());
+  }
+}
+
 function checkTodoReset() {
   const td = today();
   if (STATE.lastTodoResetDate && STATE.lastTodoResetDate !== td) {
@@ -2278,33 +2323,49 @@ function capitalize(s) { return s ? s.charAt(0).toUpperCase()+s.slice(1) : ''; }
 // ==================== DATA MIGRATION ====================
 function exportData() {
   const data = localStorage.getItem('studentPlanner_v3') || JSON.stringify(STATE);
-  navigator.clipboard.writeText(data).then(() => {
-    showToast('Data copied to clipboard! Now open Vercel and click Import.', 'success');
-  }).catch(() => {
-    const res = prompt("Copy this data manually:", data);
-  });
+  const blob = new Blob([data], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  const dateStr = new Date().toISOString().split('T')[0];
+  a.download = `StudyPlanner_Backup_${dateStr}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('Backup downloaded successfully!', 'success');
+  localStorage.setItem('lastBackupDate', Date.now().toString());
 }
 function importData() {
-  const input = prompt("Paste your exported data here:");
-  if (!input) return;
-  try {
-    const d = JSON.parse(input);
-    if (d && typeof d === 'object') {
-      if (d.workout) STATE.workout = Object.assign({}, STATE.workout, d.workout);
-      if (d.semester) STATE.semester = Object.assign({}, STATE.semester, d.semester);
-      if (d.categories) STATE.categories = Object.assign({}, STATE.categories, d.categories);
-      Object.assign(STATE, d);
-      STATE.workout = d.workout || STATE.workout;
-      STATE.semester = d.semester || STATE.semester;
-      STATE.categories = d.categories || STATE.categories;
-      localStorage.setItem('studentPlanner_v3', JSON.stringify(STATE));
-      save(); // Push to Firebase if logged in
-      renderAll();
-      showToast('Data imported successfully!', 'success');
-    }
-  } catch(e) {
-    showToast('Invalid data format', 'error');
-  }
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.json,application/json';
+  input.onchange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const d = JSON.parse(ev.target.result);
+        if (d && typeof d === 'object') {
+          if (d.workout) STATE.workout = Object.assign({}, STATE.workout, d.workout);
+          if (d.semester) STATE.semester = Object.assign({}, STATE.semester, d.semester);
+          if (d.categories) STATE.categories = Object.assign({}, STATE.categories, d.categories);
+          Object.assign(STATE, d);
+          STATE.workout = d.workout || STATE.workout;
+          STATE.semester = d.semester || STATE.semester;
+          STATE.categories = d.categories || STATE.categories;
+          localStorage.setItem('studentPlanner_v3', JSON.stringify(STATE));
+          isCloudDataLoaded = true;
+          save(); // Push to Firebase if logged in
+          renderAll();
+          showToast('Data imported successfully!', 'success');
+        }
+      } catch(err) {
+        showToast('Invalid backup file format', 'error');
+      }
+    };
+    reader.readAsText(file);
+  };
+  input.click();
 }
 
 // ==================== FIREBASE SYNC & AUTH ====================
@@ -2574,6 +2635,7 @@ function init() {
     }
   }, 60000); // Check every minute
   checkTodoNotifications(); // Check immediately on load
+  checkBackupReminder(); // Check backup reminder immediately on load
 
   // Habits
   document.getElementById('prevHabitMonth').addEventListener('click',()=>{STATE.habitMonthOffset--; renderHabits();});
