@@ -1141,7 +1141,7 @@ function checkTodoNotifications() {
     
     localStorage.setItem('lastTodoNotification', now.toString());
   }
-
+}
 
 function checkTodoReset() {
   const td = today();
