@@ -739,26 +739,34 @@ function saveExam(id='') {
 function renderCourses() {
   const activeGrid = document.getElementById('activeCoursesGrid');
   const completedGrid = document.getElementById('completedCoursesGrid');
+  const upcomingGrid = document.getElementById('upcomingCoursesGrid');
   const activeHeader = document.getElementById('activeCourseHeader');
   const completedHeader = document.getElementById('completedCourseHeader');
-  if (!activeGrid || !completedGrid) return;
+  const upcomingHeader = document.getElementById('upcomingCourseHeader');
+  if (!activeGrid || !completedGrid || !upcomingGrid) return;
   
-  activeGrid.innerHTML = ''; completedGrid.innerHTML = '';
+  activeGrid.innerHTML = ''; completedGrid.innerHTML = ''; upcomingGrid.innerHTML = '';
   
-  let activeCourses = STATE.courses.filter(c => c.status !== 'completed');
+  let activeCourses = STATE.courses.filter(c => c.status !== 'completed' && c.status !== 'upcoming');
   let completedCourses = STATE.courses.filter(c => c.status === 'completed');
+  let upcomingCourses = STATE.courses.filter(c => c.status === 'upcoming');
 
   // Sort courses by code (indexing)
   activeCourses.sort((a,b) => (a.code||'').localeCompare(b.code||''));
   completedCourses.sort((a,b) => (a.code||'').localeCompare(b.code||''));
+  upcomingCourses.sort((a,b) => (a.code||'').localeCompare(b.code||''));
 
-  if (courseFilter === 'active') { completedCourses = []; }
-  if (courseFilter === 'completed') { activeCourses = []; }
+  if (courseFilter === 'active') { completedCourses = []; upcomingCourses = []; }
+  if (courseFilter === 'completed') { activeCourses = []; upcomingCourses = []; }
+  if (courseFilter === 'upcoming') { activeCourses = []; completedCourses = []; }
 
   activeHeader.style.display = activeCourses.length || courseFilter === 'all' || courseFilter === 'active' ? 'flex' : 'none';
   completedHeader.style.display = completedCourses.length || courseFilter === 'all' || courseFilter === 'completed' ? 'flex' : 'none';
+  upcomingHeader.style.display = upcomingCourses.length || courseFilter === 'all' || courseFilter === 'upcoming' ? 'flex' : 'none';
+  
   activeGrid.style.display = activeHeader.style.display === 'none' ? 'none' : 'grid';
   completedGrid.style.display = completedHeader.style.display === 'none' ? 'none' : 'grid';
+  upcomingGrid.style.display = upcomingHeader.style.display === 'none' ? 'none' : 'grid';
 
   function renderList(list, gridEl, emptyMsg) {
     if (!list.length) { gridEl.innerHTML=`<div class="empty-state full-empty"><span>📭</span><p>${emptyMsg}</p></div>`; return; }
@@ -786,6 +794,7 @@ function renderCourses() {
 
   renderList(activeCourses, activeGrid, 'No active courses.');
   renderList(completedCourses, completedGrid, 'No completed courses.');
+  renderList(upcomingCourses, upcomingGrid, 'No upcoming courses.');
 }
 function deleteCourse(id) { STATE.courses=STATE.courses.filter(c=>c.id!==id); save(); renderCourses(); showToast('Deleted','info'); }
 function toggleCourseStatus(id) {
@@ -850,7 +859,8 @@ function buildCourseForm(c={}) {
     <div class="form-group">
       <label class="form-label">Status</label>
       <select id="f_courseStatus" class="form-select">
-        <option value="active" ${c.status !== 'completed' ? 'selected' : ''}>Active</option>
+        <option value="active" ${c.status !== 'completed' && c.status !== 'upcoming' ? 'selected' : ''}>Active</option>
+        <option value="upcoming" ${c.status === 'upcoming' ? 'selected' : ''}>Upcoming</option>
         <option value="completed" ${c.status === 'completed' ? 'selected' : ''}>Completed</option>
       </select>
     </div>

@@ -259,6 +259,7 @@
       <div class="filter-bar">
         <div class="filter-group" id="courseFilterGroup">
           <button class="filter-btn active" data-course-filter="active">Active Courses</button>
+          <button class="filter-btn" data-course-filter="upcoming">Upcoming Courses</button>
           <button class="filter-btn" data-course-filter="completed">Completed Courses</button>
         </div>
         <button class="btn btn-primary" id="addCourseBtn">+ Add Course</button>
@@ -274,8 +275,15 @@
       <h3 id="completedCourseHeader" style="margin-top: 10px; margin-bottom: 10px; color: var(--green); display: flex; align-items: center; gap: 8px;">
         ✅ Completed Courses
       </h3>
-      <div class="courses-grid" id="completedCoursesGrid">
+      <div class="courses-grid" id="completedCoursesGrid" style="margin-bottom: 30px;">
         <div class="empty-state full-empty"><span>📭</span><p>No completed courses.</p></div>
+      </div>
+
+      <h3 id="upcomingCourseHeader" style="margin-top: 10px; margin-bottom: 10px; color: var(--warning); display: flex; align-items: center; gap: 8px;">
+        ⏳ Upcoming Courses
+      </h3>
+      <div class="courses-grid" id="upcomingCoursesGrid">
+        <div class="empty-state full-empty"><span>📭</span><p>No upcoming courses.</p></div>
       </div>
     </section>
 
