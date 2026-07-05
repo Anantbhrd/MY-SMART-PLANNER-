@@ -1131,52 +1131,7 @@ function checkTodoNotifications() {
     
     localStorage.setItem('lastTodoNotification', now.toString());
   }
-}
 
-function checkBackupReminder() {
-  const lastBackup = localStorage.getItem('lastBackupDate');
-  const now = Date.now();
-  const tenDaysMs = 10 * 24 * 60 * 60 * 1000;
-  
-  if (!lastBackup || (now - parseInt(lastBackup) >= tenDaysMs)) {
-    const text = `It's been a while since your last backup! It's highly recommended to download a local backup of your data to keep it safe.`;
-    document.getElementById('reminderModalText').textContent = text;
-    // Set timestamp
-    const tsEl = document.getElementById('reminderTimestamp');
-    if (tsEl) {
-      tsEl.textContent = new Date().toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit' }) + ' IST';
-    }
-    
-    // Add a quick backup action button dynamically if it doesn't exist
-    let actionBtn = document.getElementById('quickBackupBtn');
-    if (!actionBtn) {
-      actionBtn = document.createElement('button');
-      actionBtn.id = 'quickBackupBtn';
-      actionBtn.className = 'btn btn-outline';
-      actionBtn.style = 'width: 100%; font-size: 16px; padding: 12px; border-radius: 12px; margin-bottom: 12px;';
-      actionBtn.textContent = '📥 Download Backup Now';
-      actionBtn.onclick = () => {
-        exportData();
-        document.getElementById('reminderOverlay').classList.remove('open');
-      };
-      document.getElementById('reminderModal').insertBefore(actionBtn, document.getElementById('reminderModal').lastElementChild);
-    } else {
-      actionBtn.style.display = 'block';
-    }
-    
-    document.getElementById('reminderOverlay').classList.add('open');
-    const audio = document.getElementById('notificationSound');
-    if (audio) {
-      audio.volume = STATE.notificationVolume !== undefined ? STATE.notificationVolume : 1.0;
-      audio.currentTime = 0;
-      audio.play().catch(e => console.log('Audio play prevented', e));
-    }
-    
-    // Update lastBackupDate so it snoozes for 10 days if they dismiss, 
-    // exportData() will update it again if they click download.
-    localStorage.setItem('lastBackupDate', now.toString());
-  }
-}
 
 function checkTodoReset() {
   const td = today();
@@ -2179,11 +2134,11 @@ function openProfileModal() {
     </div>`}
     
     <div class="divider"></div>
-    <div class="form-group" style="margin-top:16px; margin-bottom: 16px;">
+      <div class="form-group" style="margin-top:16px; margin-bottom: 16px;">
       <label class="form-label">Data Management</label>
       <div style="display:flex;gap:8px;margin-top:4px;">
-        <button class="btn btn-outline" style="flex:1" onclick="exportData()">📤 Export Data</button>
-        <button class="btn btn-outline" style="flex:1" onclick="importData()">📥 Import Data</button>
+        <button class="btn btn-outline" style="flex:1" onclick="exportData()">📤 Download Backup</button>
+        <button class="btn btn-outline" style="flex:1" onclick="importData()">📥 Restore Backup</button>
       </div>
       <button class="btn btn-outline" style="width:100%; margin-top:8px;" onclick="openCategoriesModal()">🏷️ Manage Categories</button>
       <button class="btn btn-outline" style="width:100%; margin-top:8px;" onclick="openModal('Add Course', buildCourseForm())">📚 Add Course</button>
@@ -2635,7 +2590,6 @@ function init() {
     }
   }, 60000); // Check every minute
   checkTodoNotifications(); // Check immediately on load
-  checkBackupReminder(); // Check backup reminder immediately on load
 
   // Habits
   document.getElementById('prevHabitMonth').addEventListener('click',()=>{STATE.habitMonthOffset--; renderHabits();});
