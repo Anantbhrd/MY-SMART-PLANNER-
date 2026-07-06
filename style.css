@@ -1066,20 +1066,27 @@ padding: 12px 10px;
 .daily-grid-wrap { padding: 10px 0; }
 .daily-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; max-width: 1000px; margin: 0 auto; }
 @media (max-width: 768px) { .daily-grid { grid-template-columns: 1fr; } }
-.planner-day-col { background: var(--bg-card); border-radius: 12px; padding: 20px; border: 1px solid var(--border); display: flex; flex-direction: column; }
-.daily-task-row { display: flex; align-items: stretch; background: var(--bg-card); border-radius: 12px; padding: 0; min-height: 50px; position: relative; transition: transform 0.2s, box-shadow 0.2s; overflow: visible; border: 2px solid var(--border); }
-.daily-task-row:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
-.daily-task-row.done { opacity: 0.6; }
-.daily-task-row.done .daily-title { text-decoration: line-through; }
-.daily-time { display: flex; align-items: center; justify-content: center; width: 80px; font-weight: 700; font-size: 14px; background: rgba(0,0,0,0.2); }
-.daily-title { flex: 1; display: flex; align-items: center; padding: 10px 15px; font-size: 16px; font-weight: 500; color: var(--text-primary); }
-.daily-check { width: 60px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background 0.2s; }
-.daily-check:hover { background: rgba(255,255,255,0.05); }
-.session-del { position: absolute; top: -6px; right: -6px; font-size: 12px; opacity: 0; transition: var(--transition); background: var(--danger); border: none; color: white; cursor: pointer; border-radius: 50%; width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; z-index: 10; padding: 0; }
-.daily-task-row:hover .session-del { opacity: 0.9; top: -8px; right: -8px; }
+.planner-day-col { background: var(--bg-card); border-radius: 16px; padding: 24px; border: 1px solid var(--border-light); display: flex; flex-direction: column; box-shadow: 0 4px 20px rgba(0,0,0,0.15); }
+
+.daily-task-row { display: flex; align-items: center; background: var(--bg-secondary); border-radius: 12px; padding: 12px 16px; min-height: 64px; position: relative; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); overflow: visible; border: 1px solid rgba(255, 255, 255, 0.05); border-left: 4px solid var(--accent); gap: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+.daily-task-row:hover { transform: translateY(-2px); box-shadow: 0 8px 16px rgba(0,0,0,0.2); background: var(--bg-card); border-color: rgba(255, 255, 255, 0.1); }
+.daily-task-row.done { opacity: 0.6; background: rgba(0,0,0,0.2); box-shadow: none; }
+.daily-task-row.done .daily-title { text-decoration: line-through; color: var(--text-muted); }
+.daily-task-row.done .daily-time { text-decoration: line-through; opacity: 0.5; }
+.daily-task-row.failed { opacity: 0.7; }
+.daily-task-row.failed .daily-title { color: var(--danger); }
+
+.daily-time { font-weight: 600; font-size: 13px; color: var(--text-muted); min-width: 70px; text-align: left; letter-spacing: 0.5px; }
+.daily-title { flex: 1; font-size: 15px; font-weight: 600; color: var(--text-primary); line-height: 1.4; }
+
+.daily-check { width: 28px; height: 28px; border-radius: 50%; border: 2px solid var(--border); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s ease; background: rgba(0,0,0,0.1); flex-shrink: 0; }
+.daily-task-row:hover .daily-check { border-color: rgba(255,255,255,0.3); }
+.daily-check:hover { transform: scale(1.1); background: rgba(255,255,255,0.1); }
+.daily-check svg { transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1); width: 16px; height: 16px; }
+
+.session-del { position: absolute; top: -6px; right: -6px; font-size: 12px; opacity: 0; transition: var(--transition); background: var(--danger); border: none; color: white; cursor: pointer; border-radius: 50%; width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; z-index: 10; padding: 0; box-shadow: 0 2px 4px rgba(244, 67, 54, 0.3); }
+.daily-task-row:hover .session-del { opacity: 0.9; transform: scale(1); }
 .session-del:hover { opacity: 1 !important; transform: scale(1.1); }
+
 .week-nav { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
 .week-label { font-size: 16px; font-weight: 700; flex: 1; text-align: center; }
-
-.daily-task-row.failed { opacity: 0.7; }
-

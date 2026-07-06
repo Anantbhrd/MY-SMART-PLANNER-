@@ -1190,13 +1190,13 @@ function renderPlanner() {
              iconHtml = `<svg viewBox="0 0 24 24" width="24" height="24" stroke="#f44336" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>`;
           }
 
-          return `<div class="daily-task-row ${isDone}" style="border: 2px solid ${color};">
-            <div class="daily-time" style="border-right: 2px solid ${color};">${escHtml(s.time || 'All Day')}</div>
+          return `<div class="daily-task-row ${isDone}" style="border-left-color: ${color};">
+            <div class="daily-time">${escHtml(s.time || 'All Day')}</div>
             <div class="daily-title">${escHtml(s.title)}</div>
-            <div class="daily-check" style="border-left: 2px solid ${color};" onclick="toggleSessionDone('${s.id}')">
+            <div class="daily-check" onclick="toggleSessionDone('${s.id}')">
               ${iconHtml}
             </div>
-            <button class="session-del" onclick="deleteSession('${s.id}')">✕</button>
+            <button class="session-del" onclick="deleteSession('${s.id}')" title="Delete Task">✕</button>
           </div>`;
       }).join('')}
       </div>
