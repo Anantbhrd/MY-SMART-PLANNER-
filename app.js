@@ -1922,7 +1922,7 @@ function renderNotes(search='') {
   const grid=document.getElementById('notesGrid');
   let notes=STATE.notes;
   if (search) notes=notes.filter(n=>n.title.toLowerCase().includes(search.toLowerCase())||n.content.toLowerCase().includes(search.toLowerCase()));
-  notes=notes.sort((a,b)=>b.updatedAt.localeCompare(a.updatedAt));
+  notes=notes.sort((a,b)=>(b.updatedAt || b.date || '').localeCompare(a.updatedAt || a.date || ''));
   const colors=['#7c5cbf22','#4a90e222','#4caf7d22','#f0965a22','#e8c44a22'];
   grid.innerHTML = !notes.length
     ? `<div class="empty-state full-empty"><span>📭</span><p>${search?'No matching notes.':'No notes yet.'}</p></div>`
@@ -1958,8 +1958,9 @@ async function handleSaveNote(id) {
     
     const title=document.getElementById('f_noteTitle')?.value||'Untitled';
     const content=document.getElementById('f_noteContent')?.value||'';
-    if (!id) STATE.notes.push({ id: genId(), title, content, attachment, date: today() });
-    else { const n=STATE.notes.find(x=>x.id===id); if(n) { n.title=title; n.content=content; if(attachment) n.attachment=attachment; } }
+    const now = new Date().toISOString();
+    if (!id) STATE.notes.push({ id: genId(), title, content, attachment, date: today(), updatedAt: now });
+    else { const n=STATE.notes.find(x=>x.id===id); if(n) { n.title=title; n.content=content; n.updatedAt=now; if(attachment) n.attachment=attachment; } }
     save(); renderNotes(); closeModal(); showToast('Note saved','success');
   } catch(e) {
     showToast('Failed: ' + e.message, 'error');
