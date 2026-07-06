@@ -357,28 +357,6 @@ input, select, textarea { font-family: var(--font); }
   #addCourseBtn { width: 100%; justify-content: center; }
 }
 
-/* --- WEEKLY PLANNER --- */
-.week-nav { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
-.week-label { font-size: 14px; font-weight: 700; flex: 1; text-align: center; }
-.weekly-grid-scroll { overflow-x: auto; overflow-y: visible; padding-bottom: 8px; }
-.weekly-grid { display: grid; grid-template-columns: repeat(7, minmax(130px, 1fr)); gap: 10px; min-height: 400px; min-width: 760px; }
-.day-col { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
-.day-col.today { border-color: var(--accent); }
-.day-header { padding: 10px; text-align: center; background: var(--bg-secondary); border-bottom: 1px solid var(--border); }
-.day-name { font-size: 10px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; }
-.day-date { font-size: 18px; font-weight: 800; margin-top: 2px; }
-.day-col.today .day-date { color: var(--accent-light); }
-.day-sessions { padding: 8px; display: flex; flex-direction: column; gap: 6px; min-height: 80px; }
-.session-block { padding: 8px 10px; border-radius: var(--radius-sm); font-size: 12px; font-weight: 600; cursor: pointer; transition: var(--transition); position: relative; }
-.session-block:hover { filter: brightness(1.1); }
-.session-time { font-size: 10px; font-weight: 400; opacity: 0.75; margin-top: 2px; }
-.session-del { position: absolute; top: 4px; right: 4px; font-size: 10px; opacity: 0; transition: var(--transition); }
-.session-block:hover .session-del { opacity: 0.8; }
-
-/* --- HABIT TRACKER --- */
-.habit-tracker-table { overflow-x: auto; overflow-y: visible; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 4px; max-width: 100%; }
-.habit-table { border-collapse: collapse; min-width: 100%; }
-.habit-table th, .habit-table td { padding: 8px 10px; text-align: center; border: 1px solid var(--border-light); font-size: 12px; white-space: nowrap; }
 .habit-table th { background: var(--bg-secondary); font-weight: 700; color: var(--text-muted); font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; }
 .habit-table .habit-name-cell { text-align: left; font-weight: 600; font-size: 13px; color: var(--text-primary); padding-left: 14px; min-width: 150px; }
 .habit-check { width: 24px; height: 24px; border-radius: var(--radius-sm); border: 2px solid var(--border); cursor: pointer; margin: 0 auto; display: flex; align-items: center; justify-content: center; transition: var(--transition); font-size: 14px; }
@@ -1084,3 +1062,24 @@ padding: 12px 10px;
   justify-content: center;
   gap: 4px;
 }
+/* --- DAILY PLANNER --- */
+.daily-grid-wrap { padding: 10px 0; }
+.daily-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; max-width: 1000px; margin: 0 auto; }
+@media (max-width: 768px) { .daily-grid { grid-template-columns: 1fr; } }
+.planner-day-col { background: var(--bg-card); border-radius: 12px; padding: 20px; border: 1px solid var(--border); display: flex; flex-direction: column; }
+.daily-task-row { display: flex; align-items: stretch; background: var(--bg-card); border-radius: 12px; padding: 0; min-height: 50px; position: relative; transition: transform 0.2s, box-shadow 0.2s; overflow: visible; border: 2px solid var(--border); }
+.daily-task-row:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+.daily-task-row.done { opacity: 0.6; }
+.daily-task-row.done .daily-title { text-decoration: line-through; }
+.daily-time { display: flex; align-items: center; justify-content: center; width: 80px; font-weight: 700; font-size: 14px; background: rgba(0,0,0,0.2); }
+.daily-title { flex: 1; display: flex; align-items: center; padding: 10px 15px; font-size: 16px; font-weight: 500; color: var(--text-primary); }
+.daily-check { width: 60px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background 0.2s; }
+.daily-check:hover { background: rgba(255,255,255,0.05); }
+.session-del { position: absolute; top: -6px; right: -6px; font-size: 12px; opacity: 0; transition: var(--transition); background: var(--danger); border: none; color: white; cursor: pointer; border-radius: 50%; width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; z-index: 10; padding: 0; }
+.daily-task-row:hover .session-del { opacity: 0.9; top: -8px; right: -8px; }
+.session-del:hover { opacity: 1 !important; transform: scale(1.1); }
+.week-nav { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
+.week-label { font-size: 16px; font-weight: 700; flex: 1; text-align: center; }
+
+.daily-task-row.failed { opacity: 0.7; }
+

@@ -52,7 +52,7 @@
         <span class="nav-icon">📚</span> Courses
       </a>
       <a href="#" class="nav-item" data-view="planner">
-        <span class="nav-icon">🗓️</span> Weekly Planner
+        <span class="nav-icon">🗓️</span> Daily Planner
       </a>
       <a href="#" class="nav-item" data-view="habits">
         <span class="nav-icon">🎯</span> Habit Tracker
@@ -290,24 +290,24 @@
     <!-- WEEKLY PLANNER VIEW -->
     <section class="view" id="view-planner">
       <div class="page-header">
-        <h1>🗓️ Weekly Planner</h1>
-        <p class="page-sub">Plan your week and manage your to-dos.</p>
+        <h1>🗓️ Daily Planner</h1>
+        <p class="page-sub">Plan your day and manage your schedule.</p>
       </div>
 
       <div class="sub-tabs" id="plannerSubTabs">
-        <button class="sub-tab active" data-subtab="planner-weekly">🗓️ Weekly Planner</button>
+        <button class="sub-tab active" data-subtab="planner-weekly">🗓️ Daily Planner</button>
         <button class="sub-tab" data-subtab="planner-todo">📝 To-Do List</button>
       </div>
 
       <div class="subtab-panel active" id="subtab-planner-weekly">
         <div class="week-nav">
-          <button class="btn btn-outline" id="prevWeek">← Prev</button>
-          <span class="week-label" id="weekLabel"></span>
-          <button class="btn btn-outline" id="nextWeek">Next →</button>
-          <button class="btn btn-primary" id="addSessionBtn">+ Add Session</button>
+          <button class="btn btn-outline" id="prevDay">← Prev</button>
+          <span class="week-label" id="dayLabel"></span>
+          <button class="btn btn-outline" id="nextDay">Next →</button>
+          <button class="btn btn-primary" id="addSessionBtn">+ Add Task</button>
         </div>
-        <div class="weekly-grid-scroll">
-          <div class="weekly-grid" id="weeklyGrid"></div>
+        <div class="daily-grid-wrap">
+          <div class="daily-grid" id="dailyGrid"></div>
         </div>
       </div>
 

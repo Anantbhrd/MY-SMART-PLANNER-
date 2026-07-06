@@ -30,6 +30,7 @@ const STATE = {
     badmintonLogs: [], // { id, date, duration, partner, setsWon, setsLost, notes }
   },
   currentView: 'dashboard',
+  dayOffset: 0,
   weekOffset: 0,
   habitMonthOffset: 0,
   theme: 'dark',
@@ -257,7 +258,7 @@ function navigate(view, e) {
   STATE.currentView = view;
   const labels = {
     dashboard:'🏠 Dashboard', assignments:'📝 Assignments', exams:'📋 Exams',
-    courses:'📚 Courses', planner:'🗓️ Weekly Planner', habits:'🎯 Habit Tracker',
+    courses:'📚 Courses', planner:'🗓️ Daily Planner', habits:'🎯 Habit Tracker',
     workout:'💪 Workout', budget:'💰 Budget Tracker', notes:'🗒️ Notes',
     completed:'✅ Completed',
   };
@@ -1157,32 +1158,87 @@ function checkTodoReset() {
   return false;
 }
 
-// ==================== WEEKLY PLANNER ====================
+// ==================== DAILY PLANNER ====================
 function renderPlanner() {
-  const dates=getWeekDates(STATE.weekOffset);
-  document.getElementById('weekLabel').textContent=`${formatDate(dates[0])} – ${formatDate(dates[6])}`;
-  const td=today();
-  const dayNames=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
-  document.getElementById('weeklyGrid').innerHTML=dates.map((date,i)=>{
-    const isToday=date===td;
-    const dayNum=new Date(date+'T00:00:00').getDate();
-    const sessions=STATE.sessions.filter(s=>s.date===date);
-    return `<div class="day-col ${isToday?'today':''}"><div class="day-header"><div class="day-name">${dayNames[i]}</div><div class="day-date">${dayNum}</div></div><div class="day-sessions">${sessions.map(s=>`<div class="session-block" style="background:${s.color||'#7c5cbf'}22;color:${s.color||'#7c5cbf'};border:1px solid ${s.color||'#7c5cbf'}44;">${escHtml(s.title)}<div class="session-time">${escHtml(s.time||'')}</div><button class="session-del" onclick="deleteSession('${s.id}')">✕</button></div>`).join('')}<button class="nav-item-btn" style="font-size:11px;color:var(--text-muted);padding:4px 6px;" onclick="addSessionForDate('${date}')">+ Add</button></div></div>`;
-  }).join('');
+  const d1 = new Date(); d1.setDate(d1.getDate() + (STATE.dayOffset || 0));
+  const d2 = new Date(); d2.setDate(d2.getDate() + (STATE.dayOffset || 0) + 1);
+  
+  const dateStr1 = d1.toISOString().split('T')[0];
+  const dateStr2 = d2.toISOString().split('T')[0];
+  
+  const dayNames = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  
+  document.getElementById('dayLabel').textContent = `${formatDate(dateStr1)} – ${formatDate(dateStr2)}`;
+  
+  const sessions1 = STATE.sessions.filter(s => s.date === dateStr1).sort((a,b) => (a.time||'').localeCompare(b.time||''));
+  const sessions2 = STATE.sessions.filter(s => s.date === dateStr2).sort((a,b) => (a.time||'').localeCompare(b.time||''));
+  
+  const renderDay = (sessions, dateStr, dayName) => {
+    return `<div class="planner-day-col">
+      <h3 style="margin-bottom:12px; text-align:center; color: var(--text-primary); font-size:16px;">${dayName} <span style="font-size:12px; color:var(--text-muted); font-weight:normal; margin-left:4px;">${formatDate(dateStr)}</span></h3>
+      <div style="display:flex; flex-direction:column; gap:12px;">
+      ${sessions.length === 0 
+        ? `<div class="empty-state"><span>🗓️</span><p>No tasks scheduled.</p></div>`
+        : sessions.map(s => {
+          const isDone = (s.done === 'done' || s.done === true) ? 'done' : s.done === 'failed' ? 'failed' : '';
+          const color = s.color || '#7c5cbf';
+          
+          let iconHtml = '';
+          if (isDone === 'done') {
+             iconHtml = `<svg viewBox="0 0 24 24" width="24" height="24" stroke="#4caf50" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
+          } else if (isDone === 'failed') {
+             iconHtml = `<svg viewBox="0 0 24 24" width="24" height="24" stroke="#f44336" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>`;
+          }
+
+          return `<div class="daily-task-row ${isDone}" style="border: 2px solid ${color};">
+            <div class="daily-time" style="border-right: 2px solid ${color};">${escHtml(s.time || 'All Day')}</div>
+            <div class="daily-title">${escHtml(s.title)}</div>
+            <div class="daily-check" style="border-left: 2px solid ${color};" onclick="toggleSessionDone('${s.id}')">
+              ${iconHtml}
+            </div>
+            <button class="session-del" onclick="deleteSession('${s.id}')">✕</button>
+          </div>`;
+      }).join('')}
+      </div>
+      <button class="btn btn-outline" style="width:100%; margin-top:12px; font-size:12px; padding:6px;" onclick="addSessionForDate('${dateStr}')">+ Add Task for ${dayName}</button>
+    </div>`;
+  };
+
+  document.getElementById('dailyGrid').innerHTML = renderDay(sessions1, dateStr1, dayNames[d1.getDay()]) + renderDay(sessions2, dateStr2, dayNames[d2.getDay()]);
 }
+
+window.toggleSessionDone = function(id) {
+  const s = STATE.sessions.find(x => x.id === id);
+  if (s) {
+    if (s.done === 'done' || s.done === true) {
+      s.done = 'failed';
+    } else if (s.done === 'failed') {
+      s.done = null;
+    } else {
+      s.done = 'done';
+    }
+    save();
+    renderPlanner();
+  }
+};
 function deleteSession(id) { STATE.sessions=STATE.sessions.filter(s=>s.id!==id); save(); renderPlanner(); renderDashboard(); showToast('Removed','info'); }
 function addSessionForDate(date) { openModal('Add Study Session',buildSessionForm({date}),()=>saveSession('')); }
 function buildSessionForm(s={}) {
   const co=STATE.courses.map(c=>`<option value="${escHtml(c.name)}" ${s.subject===c.name?'selected':''}>${escHtml(c.name)}</option>`).join('');
   return `<div class="form-group"><label class="form-label">Title *</label><input class="form-input" id="f_title" value="${escHtml(s.title||'')}" placeholder="e.g. Study Calculus"/></div>
-    <div class="form-row"><div class="form-group"><label class="form-label">Date</label><input class="form-input" type="date" id="f_date" value="${s.date||today()}"/></div><div class="form-group"><label class="form-label">Time</label><input class="form-input" type="time" id="f_time" value="${s.time||''}"/></div></div>
+    <div class="form-row"><div class="form-group"><label class="form-label">Date</label><input class="form-input" type="date" id="f_date" value="${s.date||today()}"/></div><div class="form-group"><label class="form-label">Time (e.g. 7:30 - 8:30)</label><input class="form-input" type="text" id="f_time" placeholder="e.g. 7.30-8.30" value="${s.time||''}"/></div></div>
     <div class="form-row"><div class="form-group"><label class="form-label">Subject</label><select class="form-select" id="f_subject"><option value="">No subject</option>${co}</select></div><div class="form-group"><label class="form-label">Color</label><input class="form-input" type="color" id="f_color" value="${s.color||'#7c5cbf'}"/></div></div>
     <div class="form-actions"><button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="saveSession('${s.id||''}')">Save</button></div>`;
 }
 function saveSession(id='') {
   const title=document.getElementById('f_title')?.value?.trim(), date=document.getElementById('f_date')?.value;
   if (!title||!date) { showToast('Title & date required','error'); return; }
-  const data={id:id||genId(),title,date,time:document.getElementById('f_time')?.value||'',subject:document.getElementById('f_subject')?.value||'',color:document.getElementById('f_color')?.value||'#7c5cbf'};
+  let doneState = null;
+  if (id) {
+    const existing = STATE.sessions.find(s => s.id === id);
+    if (existing) doneState = existing.done;
+  }
+  const data={id:id||genId(),title,date,time:document.getElementById('f_time')?.value||'',subject:document.getElementById('f_subject')?.value||'',color:document.getElementById('f_color')?.value||'#7c5cbf', done: doneState};
   if (id) { const idx=STATE.sessions.findIndex(s=>s.id===id); if(idx>=0) STATE.sessions[idx]=data; } else STATE.sessions.push(data);
   save(); closeModal(); renderPlanner(); renderDashboard(); showToast('Saved!','success');
 }
@@ -2527,9 +2583,13 @@ function init() {
   }
 
   // Planner
-  document.getElementById('prevWeek').addEventListener('click',()=>{STATE.weekOffset--; renderPlanner();});
-  document.getElementById('nextWeek').addEventListener('click',()=>{STATE.weekOffset++; renderPlanner();});
-  document.getElementById('addSessionBtn').addEventListener('click',()=>openModal('Add Session',buildSessionForm(),()=>saveSession('')));
+  document.getElementById('prevDay').addEventListener('click', () => { STATE.dayOffset = (STATE.dayOffset||0) - 2; renderPlanner(); });
+  document.getElementById('nextDay').addEventListener('click', () => { STATE.dayOffset = (STATE.dayOffset||0) + 2; renderPlanner(); });
+  document.getElementById('addSessionBtn').addEventListener('click', () => {
+    const d = new Date(); d.setDate(d.getDate() + (STATE.dayOffset||0));
+    const dateStr = d.toISOString().split('T')[0];
+    openModal('Add Task', buildSessionForm({date: dateStr}), () => saveSession(''));
+  });
 
   // Planner Tabs
   const plannerTabs = document.getElementById('plannerSubTabs');
