@@ -1888,6 +1888,25 @@ function renderBudget() {
   document.getElementById('budgetProgressFill').style.width = `${pct}%`;
   document.getElementById('budgetPct').textContent = `${pct}% used`;
   
+  const [year, month] = window.currentBudgetMonth.split('-');
+  const totalDaysInMonth = new Date(year, month, 0).getDate();
+
+  let daysForAvg = isCurrentMonth ? new Date().getDate() : totalDaysInMonth;
+  const dailyAvg = total / daysForAvg;
+  const avgEl = document.getElementById('budgetDailyAvg');
+  if (avgEl) avgEl.textContent = `₹${dailyAvg.toFixed(2)}`;
+  
+  let safeDaily = 0;
+  if (isCurrentMonth && remaining > 0) {
+    const daysLeft = totalDaysInMonth - new Date().getDate() + 1;
+    safeDaily = remaining / daysLeft;
+  }
+  const safeEl = document.getElementById('budgetSafeDaily');
+  if (safeEl) {
+    safeEl.textContent = `₹${safeDaily.toFixed(2)}`;
+    safeEl.className = `budget-value ${remaining >= 0 ? 'green' : 'red'}`;
+  }
+  
   let rows = expenses;
   if (budgetFilter !== 'all') rows = rows.filter(e=>categoryMatch(e.category, budgetFilter));
   rows = rows.sort((a,b)=>b.date.localeCompare(a.date));
