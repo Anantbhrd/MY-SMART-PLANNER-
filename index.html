@@ -362,7 +362,7 @@
 
       <!-- Sub-tabs -->
       <div class="sub-tabs" id="workoutSubTabs">
-        <button class="sub-tab active" data-subtab="today">📅 Today</button>
+        <button class="sub-tab active" data-subtab="today">📅 Daily</button>
         <button class="sub-tab" data-subtab="plan">📋 Workout Plan</button>
         <button class="sub-tab" data-subtab="machines">🏋️ Machines</button>
         <button class="sub-tab" data-subtab="badminton">🏸 Badminton</button>
@@ -371,10 +371,16 @@
 
       <!-- TODAY SUB-TAB -->
       <div class="subtab-panel active" id="subtab-today">
+        <div class="week-nav" style="margin-bottom:20px;">
+          <button class="btn btn-outline" id="prevWorkoutDay">← Prev</button>
+          <span class="week-label" id="workoutDayLabel" style="min-width: 150px; text-align: center;"></span>
+          <button class="btn btn-outline" id="nextWorkoutDay">Next →</button>
+          <button class="btn btn-primary" id="todayWorkoutBtn" style="margin-left: 12px;">Today</button>
+        </div>
         <div class="two-col" style="margin-bottom:20px;">
           <div class="card">
             <div class="card-header">
-              <h2>🏋️ Gym Session — Today</h2>
+              <h2>🏋️ Gym Session</h2>
               <button class="btn btn-sm btn-primary" id="logGymBtn">+ Log Gym</button>
             </div>
             <div id="todayGymLog">
@@ -383,7 +389,7 @@
           </div>
           <div class="card">
             <div class="card-header">
-              <h2>🏸 Badminton — Today</h2>
+              <h2>🏸 Badminton</h2>
               <button class="btn btn-sm btn-primary" id="logBadmintonBtn">+ Log Badminton</button>
             </div>
             <div id="todayBadmintonLog">
@@ -395,7 +401,7 @@
         <!-- Today's Plan exercises -->
         <div class="card">
           <div class="card-header">
-            <h2>📋 Today's Planned Exercises</h2>
+            <h2>📋 Planned Exercises</h2>
             <span id="todayPlanDayLabel" style="font-size:12px;color:var(--text-muted);"></span>
           </div>
           <div id="todayPlanExercises">

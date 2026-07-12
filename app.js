@@ -34,6 +34,7 @@ const STATE = {
   weekOffset: 0,
   habitMonthOffset: 0,
   theme: 'dark',
+  workoutDateOffset: 0,
   workoutSubTab: 'today',
   machineFilter: 'all',
   historyFilter: 'all',
@@ -1387,8 +1388,15 @@ function renderWorkoutSubTab(tab) {
 
 // ---- TODAY ----
 function renderWorkoutToday() {
-  const td = today();
+  const d = new Date();
+  d.setDate(d.getDate() + (STATE.workoutDateOffset || 0));
+  const td = d.toISOString().split('T')[0];
   const dow = dayOfWeek(td);
+
+  const dayLabelEl = document.getElementById('workoutDayLabel');
+  if (dayLabelEl) {
+    dayLabelEl.textContent = (td === today() ? 'Today (' : '') + formatDate(td) + (td === today() ? ')' : '');
+  }
 
   // Gym log today
   const gymEl = document.getElementById('todayGymLog');
@@ -1451,7 +1459,7 @@ function renderWorkoutToday() {
   // Today's planned exercises from active plan
   const planEl = document.getElementById('todayPlanExercises');
   const labelEl = document.getElementById('todayPlanDayLabel');
-  labelEl.textContent = `Today is ${dow}`;
+  labelEl.textContent = td === today() ? `Today is ${dow}` : `${dow} (${formatDate(td)})`;
 
   const activePlan = STATE.workout.plans.find(p => p.id === STATE.workout.activePlanId);
   if (!activePlan) {
@@ -1488,7 +1496,9 @@ function toggleExDone(gymLogId, exIdx) {
 }
 
 function markPlanExerciseDone(planId, dow, exIdx) {
-  const td = today();
+  const d = new Date();
+  d.setDate(d.getDate() + (STATE.workoutDateOffset || 0));
+  const td = d.toISOString().split('T')[0];
   const plan = STATE.workout.plans.find(p => p.id === planId);
   if (!plan) return;
   const ex = plan.days[dow]?.[exIdx];
@@ -1513,13 +1523,17 @@ function deleteGymLog(id) { STATE.workout.gymLogs=STATE.workout.gymLogs.filter(g
 function deleteBadmintonLog(id) { STATE.workout.badmintonLogs=STATE.workout.badmintonLogs.filter(b=>b.id!==id); save(); renderWorkoutToday(); renderBadminton(); renderDashboard(); showToast('Deleted','info'); }
 
 function openLogGym(existingId = '') {
+  const d = new Date();
+  d.setDate(d.getDate() + (STATE.workoutDateOffset || 0));
+  const selDate = d.toISOString().split('T')[0];
+
   const existing = existingId ? STATE.workout.gymLogs.find(g => g.id === existingId) : null;
   const machineOpts = STATE.workout.machines.map(m => `<option value="${m.id}" data-name="${escHtml(m.name)}">${escHtml(m.name)} (${m.category})</option>`).join('');
   const exRows = (existing?.exercises || []).map((ex, i) => buildExerciseInputRow(i, ex)).join('');
 
   openModal(existingId ? 'Edit Gym Log' : '🏋️ Log Gym Session', `
     <div class="form-row">
-      <div class="form-group"><label class="form-label">Date</label><input class="form-input" type="date" id="f_gymDate" value="${existing?.date||today()}"/></div>
+      <div class="form-group"><label class="form-label">Date</label><input class="form-input" type="date" id="f_gymDate" value="${existing?.date||selDate}"/></div>
       <div class="form-group"><label class="form-label">Duration (min)</label><input class="form-input" type="number" min="1" id="f_gymDuration" value="${existing?.duration||''}"/></div>
     </div>
     <div class="form-group"><label class="form-label">Exercises</label>
@@ -1769,9 +1783,13 @@ function renderBadminton() {
 }
 
 function openLogBadminton() {
+  const d = new Date();
+  d.setDate(d.getDate() + (STATE.workoutDateOffset || 0));
+  const selDate = d.toISOString().split('T')[0];
+
   openModal('🏸 Log Badminton Session', `
     <div class="form-row">
-      <div class="form-group"><label class="form-label">Date</label><input class="form-input" type="date" id="f_badDate" value="${today()}"/></div>
+      <div class="form-group"><label class="form-label">Date</label><input class="form-input" type="date" id="f_badDate" value="${selDate}"/></div>
       <div class="form-group"><label class="form-label">Duration (min) *</label><input class="form-input" type="number" min="1" id="f_badDuration" placeholder="45"/></div>
     </div>
     <div class="form-row">
@@ -2687,6 +2705,10 @@ function init() {
   document.getElementById('addHabitBtn').addEventListener('click',()=>openModal('Add Habit',buildHabitForm(),()=>saveHabit('')));
 
   // WORKOUT sub-tabs
+  document.getElementById('prevWorkoutDay')?.addEventListener('click', () => { STATE.workoutDateOffset = (STATE.workoutDateOffset || 0) - 1; renderWorkoutToday(); });
+  document.getElementById('nextWorkoutDay')?.addEventListener('click', () => { STATE.workoutDateOffset = (STATE.workoutDateOffset || 0) + 1; renderWorkoutToday(); });
+  document.getElementById('todayWorkoutBtn')?.addEventListener('click', () => { STATE.workoutDateOffset = 0; renderWorkoutToday(); });
+
   document.getElementById('workoutSubTabs').addEventListener('click',e=>{
     const btn=e.target.closest('.sub-tab'); if (!btn) return;
     setWorkoutSubTab(btn.dataset.subtab);
