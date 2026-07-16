@@ -107,7 +107,7 @@ async function uploadFile(file) {
       reader.readAsDataURL(file);
     } else {
       // For PDFs, docs etc.
-      if (file.size > 1.5 * 1024 * 1024) return reject(new Error("File too large. Please keep non-image files under 1.5MB."));
+      if (file.size > 500 * 1024) return reject(new Error("File too large for free sync. Please keep non-image files under 500KB."));
       const reader = new FileReader();
       reader.onload = (e) => resolve(e.target.result);
       reader.onerror = () => reject(new Error("Failed to read file"));
@@ -122,11 +122,20 @@ let isCloudDataLoaded = false;
 
 // ==================== PERSISTENCE ====================
 function save() {
-  try { localStorage.setItem('studentPlanner_v3', JSON.stringify(STATE)); } catch(e) {}
-  if (currentUser && isCloudDataLoaded) {
-    db.collection('users').doc(currentUser.uid).set(STATE, { merge: true })
-      .catch(err => console.error("Firebase save error:", err));
-  }
+  try { 
+    const stateStr = JSON.stringify(STATE);
+    localStorage.setItem('studentPlanner_v3', stateStr); 
+    
+    if (currentUser && isCloudDataLoaded) {
+      // Prevent silent failures from Firestore's 1MB document limit
+      if (stateStr.length > 950000) {
+        showToast('Storage Full: Your data is too large to sync to the cloud. Please delete some large photos or files.', 'error');
+        return;
+      }
+      db.collection('users').doc(currentUser.uid).set(STATE, { merge: true })
+        .catch(err => console.error("Firebase save error:", err));
+    }
+  } catch(e) { console.error(e); }
 }
 function load() {
   try {
