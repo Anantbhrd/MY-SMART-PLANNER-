@@ -80,11 +80,40 @@ const storage = firebase.storage();
 const provider = new firebase.auth.GoogleAuthProvider();
 
 async function uploadFile(file) {
-  if (!currentUser) throw new Error("You must sign in to upload files.");
-  const safeName = file.name.replace(/[^a-zA-Z0-9.\-_]/g, '');
-  const ref = storage.ref(`user_uploads/${currentUser.uid}/${Date.now()}_${safeName}`);
-  await ref.put(file);
-  return await ref.getDownloadURL();
+  return new Promise((resolve, reject) => {
+    if (file.type.startsWith('image/')) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+          const MAX_WIDTH = 800; // Compress large images
+          if (width > MAX_WIDTH) {
+            height = Math.round(height * (MAX_WIDTH / width));
+            width = MAX_WIDTH;
+          }
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+          resolve(canvas.toDataURL('image/jpeg', 0.6)); // Highly compressed JPEG
+        };
+        img.onerror = () => reject(new Error("Failed to process image"));
+        img.src = e.target.result;
+      };
+      reader.onerror = () => reject(new Error("Failed to read file"));
+      reader.readAsDataURL(file);
+    } else {
+      // For PDFs, docs etc.
+      if (file.size > 1.5 * 1024 * 1024) return reject(new Error("File too large. Please keep non-image files under 1.5MB."));
+      const reader = new FileReader();
+      reader.onload = (e) => resolve(e.target.result);
+      reader.onerror = () => reject(new Error("Failed to read file"));
+      reader.readAsDataURL(file);
+    }
+  });
 }
 
 let currentUser = null;
