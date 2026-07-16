@@ -386,22 +386,23 @@
           <button class="btn btn-primary" id="todayWorkoutBtn" style="margin-left: 12px;">Today</button>
         </div>
 
-        <!-- Activity Checklist (Badminton + Custom always visible) -->
-        <div class="card" style="margin-bottom:20px;">
-          <div class="card-header">
-            <h2>🏃 Activities</h2>
-            <button class="btn btn-sm btn-outline" onclick="navigate('workout'); setWorkoutSubTab('activities');">Manage →</button>
-          </div>
-          <div id="todayActivityChecklist" class="exercise-list"></div>
-        </div>
-
         <div class="two-col" style="margin-bottom:20px;">
-          <div class="card">
+          <!-- Activity Checklist -->
+          <div class="card" style="display:flex; flex-direction:column;">
+            <div class="card-header">
+              <h2>🏃 Activities</h2>
+              <button class="btn btn-sm btn-outline" onclick="navigate('workout'); setWorkoutSubTab('activities');">Manage →</button>
+            </div>
+            <div id="todayActivityChecklist" class="exercise-list" style="flex:1;"></div>
+          </div>
+
+          <!-- Gym Session -->
+          <div class="card" style="display:flex; flex-direction:column;">
             <div class="card-header">
               <h2>🏋️ Gym Session</h2>
               <button class="btn btn-sm btn-primary" id="logGymBtn">+ Log Gym</button>
             </div>
-            <div id="todayGymLog">
+            <div id="todayGymLog" style="flex:1;">
               <div class="empty-state"><span>🏋️</span><p>No gym session logged today.</p></div>
             </div>
           </div>
