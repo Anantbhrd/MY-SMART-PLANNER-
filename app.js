@@ -22,13 +22,19 @@ const STATE = {
     machines: ['Strength', 'Cardio', 'Flexibility', 'Free Weights', 'Other']
   },
   semester: { startDate: '', endDate: '', name: 'Semester 1', marksLastInternals: '', marksLastSemester: '' },
+  semesters: [], // archived semesters: [{name, startDate, endDate, courses:[], completedExams:[], marksInternals, marksSemester}]
   workout: {
     machines: [],
     plans: [],
     activePlanId: null,
-    gymLogs: [],      // { id, date, duration, exercises:[{machineId,machineName,sets,reps,weight,done}], notes }
-    badmintonLogs: [], // { id, date, duration, partner, setsWon, setsLost, notes }
+    gymLogs: [],
+    badmintonLogs: [],
+    customActivities: [], // [{id, name, emoji}] e.g. Cricket, Running, Jogging
+    activityLogs: [],     // [{id, date, activityId, activityName, duration, calories}]
   },
+  studyLogs: [],  // [{date, hours, tasks}]
+  timezone: 'Asia/Kolkata',
+  currency: { symbol: '₹', code: 'INR' },
   currentView: 'dashboard',
   dayOffset: 0,
   weekOffset: 0,
@@ -38,12 +44,15 @@ const STATE = {
   workoutSubTab: 'today',
   machineFilter: 'all',
   historyFilter: 'all',
+  activityFilter: 'all',
   todos: [],
   completedExams: [],
   completedAssignments: [],
   lastTodoResetDate: '',
+  lastStudyPromptDate: '',
   todoNotificationInterval: 6,
   dashboardTiles: [
+    { id: 'randomTopic', title: '🎲 Random Study Topic', visible: true, order: 0 },
     { id: 'deadlines', title: '⏰ Upcoming Deadlines', visible: true, order: 1 },
     { id: 'exams', title: '📋 Exam Countdown', visible: true, order: 2 },
     { id: 'todos', title: "📝 Today's To-Do List", visible: true, order: 3 },
@@ -105,9 +114,22 @@ function load() {
       STATE.completedExams = d.completedExams || [];
       STATE.completedAssignments = d.completedAssignments || [];
       STATE.photos = d.photos || [];
+      STATE.studyLogs = d.studyLogs || [];
+      STATE.semesters = d.semesters || [];
+      STATE.timezone = d.timezone || 'Asia/Kolkata';
+      STATE.currency = d.currency || { symbol: '₹', code: 'INR' };
+      STATE.activityFilter = d.activityFilter || 'all';
+      if (!STATE.workout.customActivities) STATE.workout.customActivities = [];
+      if (!STATE.workout.activityLogs) STATE.workout.activityLogs = [];
       if (d.lastTodoResetDate) STATE.lastTodoResetDate = d.lastTodoResetDate;
+      if (d.lastStudyPromptDate) STATE.lastStudyPromptDate = d.lastStudyPromptDate;
       if (d.todoNotificationInterval) STATE.todoNotificationInterval = d.todoNotificationInterval;
       if (d.dashboardTiles) STATE.dashboardTiles = d.dashboardTiles;
+      STATE.statsConfig = d.statsConfig || { type: 'bar', range: 'month' };
+      // Ensure randomTopic tile exists
+      if (!STATE.dashboardTiles.find(t => t.id === 'randomTopic')) {
+        STATE.dashboardTiles.unshift({ id: 'randomTopic', title: '🎲 Random Study Topic', visible: true, order: 0 });
+      }
       checkTodoReset();
     }
   } catch(e) {}
@@ -139,7 +161,12 @@ function showToast(msg, type = 'info') {
 }
 
 // ==================== DATE UTILS ====================
-function today() { return new Date().toISOString().split('T')[0]; }
+function today() {
+  const tz = STATE.timezone || 'Asia/Kolkata';
+  const now = new Date();
+  const parts = now.toLocaleDateString('en-CA', { timeZone: tz }); // en-CA gives YYYY-MM-DD
+  return parts;
+}
 function formatDate(d) {
   if (!d) return '';
   const dt = new Date(d + 'T00:00:00');
@@ -151,6 +178,7 @@ function daysUntil(d) {
   const target = new Date(d + 'T00:00:00');
   return Math.round((target - now) / 86400000);
 }
+function getCurrencySymbol() { return (STATE.currency && STATE.currency.symbol) || '₹'; }
 function getWeekDates(offset = 0) {
   const now = new Date();
   const day = now.getDay();
@@ -225,6 +253,16 @@ function openSemesterSettings() {
     </div>
     <div class="form-row">
       <div class="form-group">
+        <label class="form-label">Internal Marks</label>
+        <input class="form-input" id="f_semInt" placeholder="e.g. 85%" value="${escHtml(STATE.semester.marksLastInternals||'')}"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">End Sem / Grade</label>
+        <input class="form-input" id="f_semEndM" placeholder="e.g. 9.2 SGPA" value="${escHtml(STATE.semester.marksLastSemester||'')}"/>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
         <label class="form-label">Start Date</label>
         <input class="form-input" type="date" id="f_semStart" value="${STATE.semester.startDate||''}"/>
       </div>
@@ -243,7 +281,10 @@ function saveSemesterSettings() {
   STATE.semester.name = document.getElementById('f_semName')?.value?.trim() || 'Semester';
   STATE.semester.startDate = document.getElementById('f_semStart')?.value || '';
   STATE.semester.endDate = document.getElementById('f_semEnd')?.value || '';
+  STATE.semester.marksLastInternals = document.getElementById('f_semInt')?.value || '';
+  STATE.semester.marksLastSemester = document.getElementById('f_semEndM')?.value || '';
   save(); closeModal(); updateSemesterUI();
+  if (STATE.currentView === 'stats') renderStats();
   showToast('Semester settings saved!', 'success');
 }
 
@@ -260,7 +301,7 @@ function navigate(view, e) {
   const labels = {
     dashboard:'🏠 Dashboard', assignments:'📝 Assignments', exams:'📋 Exams',
     courses:'📚 Courses', planner:'🗓️ Daily Planner', habits:'🎯 Habit Tracker',
-    workout:'💪 Workout', budget:'💰 Budget Tracker', notes:'🗒️ Notes',
+    workout:'💪 Workout', stats:'📊 Stats & Progress', budget:'💰 Budget Tracker', notes:'🗒️ Notes',
     completed:'✅ Completed',
   };
   document.getElementById('topbarBreadcrumb').textContent = labels[view] || view;
@@ -280,12 +321,28 @@ function renderView(view) {
     case 'assignments': renderAssignments(); break;
     case 'exams': renderExams(); break;
     case 'courses': renderCourses(); break;
-    case 'planner': renderPlanner(); renderTodos(); break;
+    case 'planner': 
+      renderPlanner(); 
+      renderTodos(); 
+      if (STATE.plannerSubTab) {
+        document.querySelector(`#plannerSubTabs [data-subtab="${STATE.plannerSubTab}"]`)?.click();
+      }
+      break;
     case 'habits': renderHabits(); break;
-    case 'workout': renderWorkout(); break;
+    case 'workout': setWorkoutSubTab(STATE.workoutSubTab || 'today'); break;
+    case 'stats': 
+      renderStats(); 
+      if (STATE.statsSubTab) {
+        document.querySelector(`#statsSubTabs [data-subtab="${STATE.statsSubTab}"]`)?.click();
+      }
+      break;
     case 'budget': renderBudget(); break;
-    case 'notes': setNotesSubTab(STATE.notesSubTab || 'notes-text'); break;
-    case 'completed': renderCompleted(); break;
+    case 'notes': 
+      renderNotes(''); 
+      if (STATE.notesSubTab) {
+        document.querySelector(`#notesSubTabs [data-subtab="${STATE.notesSubTab}"]`)?.click();
+      }
+      break;
   }
 }
 
@@ -300,7 +357,7 @@ function renderDashboard() {
   document.getElementById('stat-pending').textContent = pending;
   document.getElementById('stat-exams').textContent = upcomingExams;
   document.getElementById('stat-done').textContent = `${todoPct}%`;
-  const habitsDone = STATE.habits.filter(h => STATE.habitLogs[`${h.id}_${td}`]).length;
+  const habitsDone = STATE.habits.filter(h => STATE.habitLogs[`${h.id}_${td}`] === 'done' || STATE.habitLogs[`${h.id}_${td}`] === true).length;
   const habitPct = STATE.habits.length ? Math.round(habitsDone / STATE.habits.length * 100) : 0;
   document.getElementById('stat-habits').textContent = `${habitPct}%`;
 
@@ -431,8 +488,12 @@ function renderDashboard() {
     hm.innerHTML = STATE.habits.length === 0
       ? `<div class="empty-state"><span>🌱</span><p>No habits added yet.</p></div>`
       : STATE.habits.map(h => {
-          const checked = !!STATE.habitLogs[`${h.id}_${td}`];
-          return `<div class="habit-mini-item"><span style="font-size:18px">${h.emoji||'✅'}</span><span class="habit-mini-name">${escHtml(h.name)}</span><div class="habit-mini-check ${checked?'checked':''}" onclick="toggleHabitLog('${h.id}','${td}')">${checked?'✓':''}</div></div>`;
+          const logVal = STATE.habitLogs[`${h.id}_${td}`];
+          const checked = logVal === 'done' || logVal === true;
+          const skipped = logVal === 'skipped';
+          const cls = checked ? 'checked' : skipped ? 'skipped' : '';
+          const icon = checked ? '✓' : skipped ? '✗' : '';
+          return `<div class="habit-mini-item"><span style="font-size:18px">${h.emoji||'✅'}</span><span class="habit-mini-name">${escHtml(h.name)}</span><div class="habit-mini-check ${cls}" onclick="toggleHabitLog('${h.id}','${td}')">${icon}</div></div>`;
         }).join('');
   }
 
@@ -449,7 +510,7 @@ function renderDashboard() {
     const limit = parseFloat(STATE.budget.limit||0);
     const remaining = limit - total;
     const pct = limit > 0 ? Math.min(100, Math.round(total/limit*100)) : 0;
-    dashBudgetRemaining.textContent = `₹${remaining.toFixed(2)}`;
+    dashBudgetRemaining.textContent = `${getCurrencySymbol()}${remaining.toFixed(2)}`;
     dashBudgetRemaining.className = `budget-value ${remaining>=0?'green':'red'}`;
     document.getElementById('dashBudgetFill').style.width = `${pct}%`;
     document.getElementById('dashBudgetPct').textContent = `${pct}% used`;
@@ -458,7 +519,14 @@ function renderDashboard() {
 
 function toggleHabitLog(hid, date) {
   const key = `${hid}_${date}`;
-  STATE.habitLogs[key] = !STATE.habitLogs[key];
+  const current = STATE.habitLogs[key];
+  if (!current || current === false) {
+    STATE.habitLogs[key] = 'done';
+  } else if (current === 'done') {
+    STATE.habitLogs[key] = 'skipped';
+  } else {
+    STATE.habitLogs[key] = false;
+  }
   save();
   if (STATE.currentView === 'dashboard') renderDashboard();
   if (STATE.currentView === 'habits') renderHabits();
@@ -853,11 +921,16 @@ function completeCourse(id) {
 function editCourse(id) { const c=STATE.courses.find(x=>x.id===id); openModal('Edit Course', buildCourseForm(c)); }
 function buildCourseForm(c={}) {
   const attHtml = c.attachment ? `<div style="margin-top:8px;"><a href="${escHtml(c.attachment)}" target="_blank" style="font-size:12px; color:var(--accent);">🔗 View current attachment</a></div>` : '';
+  const semesters = [{name: STATE.semester.name||'Current Semester'}, ...(STATE.semesters||[])];
+  const semOpts = semesters.map(s => `<option value="${escHtml(s.name)}" ${c.semester===s.name?'selected':''}>${escHtml(s.name)}</option>`).join('');
   return `
     <div class="form-group"><label class="form-label">Course Code</label><input type="text" id="f_courseCode" class="form-input" value="${escHtml(c.code||'')}" placeholder="e.g. CS101"/></div>
     <div class="form-group"><label class="form-label">Course Name</label><input type="text" id="f_courseName" class="form-input" value="${escHtml(c.name||'')}" placeholder="e.g. Intro to Computer Science"/></div>
     <div class="form-group"><label class="form-label">Professor/Instructor</label><input type="text" id="f_courseProf" class="form-input" value="${escHtml(c.prof||'')}" placeholder="e.g. Dr. Smith"/></div>
-    <div class="form-group"><label class="form-label">Color</label><input type="color" id="f_courseColor" class="form-input" value="${c.color||'#3b82f6'}" style="height:40px;padding:2px;"/></div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Color</label><input type="color" id="f_courseColor" class="form-input" value="${c.color||'#3b82f6'}" style="height:40px;padding:2px;"/></div>
+      <div class="form-group"><label class="form-label">Semester</label><select id="f_courseSemester" class="form-select"><option value="">No Semester</option>${semOpts}</select></div>
+    </div>
     <div class="form-group">
       <label class="form-label">Status</label>
       <select id="f_courseStatus" class="form-select">
@@ -886,8 +959,9 @@ async function handleSaveCourse(id) {
     const prof=document.getElementById('f_courseProf')?.value||'';
     const color=document.getElementById('f_courseColor')?.value||'#3b82f6';
     const status=document.getElementById('f_courseStatus')?.value||'active';
-    if (!id) STATE.courses.push({ id: genId(), code, name, prof, color, status, attachment });
-    else { const c=STATE.courses.find(x=>x.id===id); if(c) { c.code=code; c.name=name; c.prof=prof; c.color=color; c.status=status; if(attachment) c.attachment=attachment; } }
+    const semester=document.getElementById('f_courseSemester')?.value||'';
+    if (!id) STATE.courses.push({ id: genId(), code, name, prof, color, status, semester, attachment });
+    else { const c=STATE.courses.find(x=>x.id===id); if(c) { c.code=code; c.name=name; c.prof=prof; c.color=color; c.status=status; c.semester=semester; if(attachment) c.attachment=attachment; } }
     save(); renderCourses(); closeModal(); showToast('Course saved','success');
   } catch(e) {
     showToast('Failed: ' + e.message, 'error');
@@ -1084,6 +1158,7 @@ function toggleTodo(id) {
   const todo = STATE.todos.find(t => t.id === id);
   if (todo) {
     todo.done = !todo.done;
+    todo.completedAt = todo.done ? new Date().toISOString() : null;
     
     const el = document.getElementById(`todo-${id}`);
     if (todo.done && el) {
@@ -1169,7 +1244,8 @@ function renderPlanner() {
   
   const dayNames = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
   
-  document.getElementById('dayLabel').textContent = `${formatDate(dateStr1)} – ${formatDate(dateStr2)}`;
+  const dayLabelEl = document.getElementById('dayLabel');
+  if (dayLabelEl) dayLabelEl.textContent = `${formatDate(dateStr1)} – ${formatDate(dateStr2)}`;
   
   const sessions1 = STATE.sessions.filter(s => s.date === dateStr1).sort((a,b) => (a.time||'').localeCompare(b.time||''));
   const sessions2 = STATE.sessions.filter(s => s.date === dateStr2).sort((a,b) => (a.time||'').localeCompare(b.time||''));
@@ -1250,24 +1326,32 @@ function calculateHabitStreak(habitId) {
   let d = new Date();
   const td = d.toISOString().split('T')[0];
   
-  if (STATE.habitLogs[`${habitId}_${td}`]) {
+  const todayLog = STATE.habitLogs[`${habitId}_${td}`];
+  if (todayLog === 'done' || todayLog === true) {
     streak++;
+  } else if (todayLog === 'skipped') {
+    return 0; // Skipped today breaks streak
   }
   
   d.setDate(d.getDate() - 1);
   let yd = d.toISOString().split('T')[0];
   
-  if (!STATE.habitLogs[`${habitId}_${td}`] && !STATE.habitLogs[`${habitId}_${yd}`]) {
+  const ydLog = STATE.habitLogs[`${habitId}_${yd}`];
+  if (!todayLog && !ydLog) {
     return 0;
+  }
+  if (todayLog === 'skipped' || ydLog === 'skipped') {
+    return streak;
   }
   
   while (true) {
     let currStr = d.toISOString().split('T')[0];
-    if (STATE.habitLogs[`${habitId}_${currStr}`]) {
+    const logVal = STATE.habitLogs[`${habitId}_${currStr}`];
+    if (logVal === 'done' || logVal === true) {
       streak++;
       d.setDate(d.getDate() - 1);
     } else {
-      break;
+      break; // false, null, or 'skipped' all break streak
     }
   }
   
@@ -1284,8 +1368,12 @@ function renderHabits() {
   const rows=STATE.habits.map(h=>{
     const streak = calculateHabitStreak(h.id);
     const dayCells=days.map(d=>{
-      const key=`${h.id}_${d}`;const checked=!!STATE.habitLogs[key];const future=d>td;
-      return `<td><div class="habit-check ${checked?'checked':''} ${future?'future':''}" ${future?'':'onclick="toggleHabitLog(\''+h.id+'\',\''+d+'\')"'}>${checked?'✓':''}</div></td>`;
+      const key=`${h.id}_${d}`;const logVal=STATE.habitLogs[key];const future=d>td;
+      const checked = logVal === 'done' || logVal === true;
+      const skipped = logVal === 'skipped';
+      const cls = checked ? 'checked' : skipped ? 'skipped' : '';
+      const icon = checked ? '✓' : skipped ? '✗' : '';
+      return `<td><div class="habit-check ${cls} ${future?'future':''}" ${future?'':'onclick="toggleHabitLog(\''+h.id+'\',\''+d+'\')"'}>${icon}</div></td>`;
     }).join('');
     return `<tr><td class="habit-name-cell"><span style="font-size:16px;margin-right:6px">${h.emoji||'✅'}</span>${escHtml(h.name)}</td>${dayCells}<td class="habit-streak-cell">🔥 ${streak}</td><td><div class="habit-actions"><button class="icon-btn" onclick="editHabit('${h.id}')">✏️</button><button class="icon-btn" onclick="deleteHabit('${h.id}')">🗑️</button></div></td></tr>`;
   }).join('');
@@ -1381,7 +1469,7 @@ function renderWorkoutSubTab(tab) {
     case 'today': renderWorkoutToday(); break;
     case 'plan': renderWorkoutPlan(); break;
     case 'machines': renderMachines(); break;
-    case 'badminton': renderBadminton(); break;
+    case 'activities': renderActivities(); break;
     case 'history': renderWorkoutHistory(); break;
   }
 }
@@ -1415,6 +1503,7 @@ function renderWorkoutToday() {
         </div>
         <div class="gym-log-meta">
           <span>⏱️ ${g.duration||'?'} min</span>
+          ${g.calories ? `<span>🔥 ${g.calories} cal</span>` : ''}
           ${g.notes ? `<span>📝 ${escHtml(g.notes)}</span>` : ''}
         </div>
         <div class="exercise-list">
@@ -1432,29 +1521,8 @@ function renderWorkoutToday() {
     `).join('');
   }
 
-  // Badminton log today
-  const badEl = document.getElementById('todayBadmintonLog');
-  const badLog = STATE.workout.badmintonLogs.filter(b => b.date === td);
-  if (badLog.length === 0) {
-    badEl.innerHTML = `<div class="empty-state"><span>🏸</span><p>No badminton session logged today.</p></div>`;
-  } else {
-    badEl.innerHTML = badLog.map(b => `
-      <div class="gym-log-entry">
-        <div class="gym-log-header">
-          <div class="gym-log-title">🏸 Badminton</div>
-          <div style="display:flex;gap:6px;">
-            <button class="btn btn-sm btn-danger" onclick="deleteBadmintonLog('${b.id}')">🗑️</button>
-          </div>
-        </div>
-        <div class="gym-log-meta">
-          <span>⏱️ ${b.duration||'?'} min</span>
-          ${b.partner ? `<span>👤 vs ${escHtml(b.partner)}</span>` : ''}
-          ${(b.setsWon||b.setsLost) ? `<span>🏆 ${b.setsWon||0}–${b.setsLost||0}</span>` : ''}
-        </div>
-        ${b.notes ? `<div style="font-size:12px;color:var(--text-muted)">${escHtml(b.notes)}</div>` : ''}
-      </div>
-    `).join('');
-  }
+  // Activity checklist
+  renderTodayActivityChecklist(td);
 
   // Today's planned exercises from active plan
   const planEl = document.getElementById('todayPlanExercises');
@@ -1476,7 +1544,8 @@ function renderWorkoutToday() {
   // Check which exercises are done in today's gym log
   const todayGym = STATE.workout.gymLogs.find(g => g.date === td);
   planEl.innerHTML = todayExercises.map((ex, idx) => {
-    const loggedEx = todayGym?.exercises?.find(e => e.machineName === ex.machineName || e.name === ex.name);
+    const uniqueKey = `${ex.machineName||ex.name}_${idx}`;
+    const loggedEx = todayGym?.exercises?.find(e => e._planKey === uniqueKey);
     const done = loggedEx?.done || false;
     return `<div class="plan-today-exercise ${done?'done-ex':''}">
       <div class="exercise-done-check ${done?'done':''}" onclick="markPlanExerciseDone('${activePlan.id}','${dow}',${idx})">
@@ -1506,14 +1575,16 @@ function markPlanExerciseDone(planId, dow, exIdx) {
 
   let gymLog = STATE.workout.gymLogs.find(g => g.date === td);
   if (!gymLog) {
-    gymLog = { id: genId(), date: td, duration: 0, exercises: [], notes: '' };
+    gymLog = { id: genId(), date: td, duration: 0, exercises: [], notes: '', calories: 0 };
     STATE.workout.gymLogs.push(gymLog);
   }
-  const existing = gymLog.exercises.findIndex(e => (e.machineName||e.name) === (ex.machineName||ex.name));
+  // Use a unique key combining name + index to prevent matching multiple exercises with the same name
+  const uniqueKey = `${ex.machineName||ex.name}_${exIdx}`;
+  const existing = gymLog.exercises.findIndex(e => e._planKey === uniqueKey);
   if (existing >= 0) {
     gymLog.exercises[existing].done = !gymLog.exercises[existing].done;
   } else {
-    gymLog.exercises.push({ machineName: ex.machineName||ex.name||'Exercise', sets: ex.targetSets||0, reps: ex.targetReps||0, weight: ex.targetWeight||0, done: true });
+    gymLog.exercises.push({ machineName: ex.machineName||ex.name||'Exercise', sets: ex.targetSets||0, reps: ex.targetReps||0, weight: ex.targetWeight||0, done: true, _planKey: uniqueKey });
   }
   save(); renderWorkoutToday(); renderDashboard();
   showToast('Exercise marked!', 'success');
@@ -1536,6 +1607,7 @@ function openLogGym(existingId = '') {
       <div class="form-group"><label class="form-label">Date</label><input class="form-input" type="date" id="f_gymDate" value="${existing?.date||selDate}"/></div>
       <div class="form-group"><label class="form-label">Duration (min)</label><input class="form-input" type="number" min="1" id="f_gymDuration" value="${existing?.duration||''}"/></div>
     </div>
+    <div class="form-group"><label class="form-label">Calories Burned</label><input class="form-input" type="number" min="0" id="f_gymCalories" value="${existing?.calories||''}" placeholder="e.g. 350"/></div>
     <div class="form-group"><label class="form-label">Exercises</label>
       <div id="exerciseInputList" style="display:flex;flex-direction:column;gap:8px;">${exRows}</div>
       <button class="btn btn-sm btn-outline" style="margin-top:8px;width:100%;" onclick="addExerciseInputRow()">+ Add Exercise</button>
@@ -1569,6 +1641,7 @@ function addExerciseInputRow() {
 function saveGymLog(id = '') {
   const date = document.getElementById('f_gymDate')?.value || today();
   const duration = parseInt(document.getElementById('f_gymDuration')?.value) || 0;
+  const calories = parseInt(document.getElementById('f_gymCalories')?.value) || 0;
   const notes = document.getElementById('f_gymNotes')?.value || '';
   const rows = document.querySelectorAll('.exercise-input-row');
   const exercises = [];
@@ -1581,7 +1654,7 @@ function saveGymLog(id = '') {
     const machineName = opt?.dataset?.name || sel?.value || '';
     if (machineName || sets || reps) exercises.push({ machineName, sets, reps, weight, done: false });
   });
-  const data = { id: id||genId(), date, duration, exercises, notes };
+  const data = { id: id||genId(), date, duration, calories, exercises, notes };
   if (id) { const idx = STATE.workout.gymLogs.findIndex(g=>g.id===id); if(idx>=0) STATE.workout.gymLogs[idx]=data; } else STATE.workout.gymLogs.push(data);
   save(); closeModal(); renderWorkoutToday(); renderWorkoutHistory(); renderDashboard();
   showToast('Gym session saved!', 'success');
@@ -1755,72 +1828,178 @@ function saveMachine(id='') {
   save(); closeModal(); renderMachines(); showToast(id?'Updated!':'Machine added!','success');
 }
 
-// ---- BADMINTON ----
-function renderBadminton() {
-  const logs = STATE.workout.badmintonLogs.sort((a,b)=>b.date.localeCompare(a.date));
-  const totalMin = logs.reduce((s,b)=>s+(parseInt(b.duration)||0), 0);
-  const totalSessions = logs.length;
-  const totalWon = logs.reduce((s,b)=>s+(parseInt(b.setsWon)||0),0);
-  const totalLost = logs.reduce((s,b)=>s+(parseInt(b.setsLost)||0),0);
+// ---- BADMINTON / ACTIVITIES ----
+function renderActivities() {
+  // Render custom activities management cards
+  const custList = document.getElementById('customActivitiesList');
+  if (custList) {
+    const activities = STATE.workout.customActivities || [];
+    if (activities.length === 0) {
+      custList.innerHTML = `<div class="empty-state"><span>🏃</span><p>No custom sports added. Click "+ Add Sport" to add cricket, running, etc.</p></div>`;
+    } else {
+      custList.innerHTML = `<div style="display:flex;flex-wrap:wrap;gap:8px;">${activities.map(a => `
+        <div class="machine-card" style="min-width:auto; padding:12px; display:inline-flex; align-items:center; gap:8px; border-left:3px solid var(--accent);">
+          <span style="font-size:20px;">${a.emoji || '🏃'}</span>
+          <span style="font-weight:600;">${escHtml(a.name)}</span>
+          <button class="icon-btn del" onclick="deleteCustomActivity('${a.id}')" style="margin-left:8px;">🗑️</button>
+        </div>
+      `).join('')}</div>`;
+    }
+  }
 
+  // Render combined activity logs (badminton + custom)
+  const allLogs = [];
+  STATE.workout.badmintonLogs.forEach(b => allLogs.push({type:'badminton', name:'🏸 Badminton', date:b.date, duration:b.duration, calories:b.calories||0, id:b.id, source:'badminton'}));
+  (STATE.workout.activityLogs||[]).forEach(a => allLogs.push({type:'custom', name:a.activityName, date:a.date, duration:a.duration, calories:a.calories||0, id:a.id, source:'activity'}));
+  
+  let filtered = allLogs;
+  if (STATE.activityFilter === 'badminton') filtered = allLogs.filter(l => l.source === 'badminton');
+  if (STATE.activityFilter === 'custom') filtered = allLogs.filter(l => l.source === 'activity');
+  filtered.sort((a,b) => b.date.localeCompare(a.date));
+
+  // Stats
+  const totalMin = filtered.reduce((s,l) => s+(parseInt(l.duration)||0), 0);
+  const totalCal = filtered.reduce((s,l) => s+(parseInt(l.calories)||0), 0);
   document.getElementById('badmintonStats').innerHTML = `
-    <div class="badminton-stat"><div class="badminton-stat-val">${totalSessions}</div><div class="badminton-stat-label">Total Sessions</div></div>
+    <div class="badminton-stat"><div class="badminton-stat-val">${filtered.length}</div><div class="badminton-stat-label">Total Sessions</div></div>
     <div class="badminton-stat"><div class="badminton-stat-val">${Math.round(totalMin/60*10)/10}h</div><div class="badminton-stat-label">Total Duration</div></div>
-    <div class="badminton-stat"><div class="badminton-stat-val" style="color:var(--green)">${totalWon}</div><div class="badminton-stat-label">Sets Won</div></div>
-    <div class="badminton-stat"><div class="badminton-stat-val" style="color:var(--red)">${totalLost}</div><div class="badminton-stat-label">Sets Lost</div></div>
+    <div class="badminton-stat"><div class="badminton-stat-val" style="color:var(--orange)">${totalCal}</div><div class="badminton-stat-label">Calories Burned</div></div>
   `;
 
   const tbody = document.getElementById('badmintonTbody');
-  if (!logs.length) { tbody.innerHTML=`<tr class="empty-row"><td colspan="6"><div class="empty-state"><span>🏸</span><p>No badminton sessions logged yet.</p></div></td></tr>`; return; }
-  tbody.innerHTML = logs.map(b => `<tr>
-    <td>${formatDate(b.date)}</td>
-    <td><strong>${b.duration||'—'}</strong> min</td>
-    <td>${escHtml(b.partner||'—')}</td>
-    <td><span style="color:var(--green)">${b.setsWon||0}</span> / <span style="color:var(--red)">${b.setsLost||0}</span></td>
-    <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(b.notes||'—')}</td>
-    <td><button class="icon-btn del" onclick="deleteBadmintonLog('${b.id}')">🗑️</button></td>
+  if (!filtered.length) { tbody.innerHTML=`<tr class="empty-row"><td colspan="5"><div class="empty-state"><span>🏸</span><p>No activity sessions logged yet.</p></div></td></tr>`; return; }
+  tbody.innerHTML = filtered.map(l => `<tr>
+    <td>${formatDate(l.date)}</td>
+    <td>${escHtml(l.name)}</td>
+    <td><strong>${l.duration||'—'}</strong> min</td>
+    <td>🔥 ${l.calories||0} cal</td>
+    <td><button class="icon-btn del" onclick="deleteActivityLog('${l.id}','${l.source}')">🗑️</button></td>
   </tr>`).join('');
 }
 
-function openLogBadminton() {
+function openLogBadminton(activityName = 'Badminton', activityId = '') {
   const d = new Date();
   d.setDate(d.getDate() + (STATE.workoutDateOffset || 0));
   const selDate = d.toISOString().split('T')[0];
+  const isCustom = activityId !== '';
+  const title = isCustom ? `🏃 Log ${escHtml(activityName)}` : '🏸 Log Badminton';
 
-  openModal('🏸 Log Badminton Session', `
+  openModal(title, `
     <div class="form-row">
       <div class="form-group"><label class="form-label">Date</label><input class="form-input" type="date" id="f_badDate" value="${selDate}"/></div>
       <div class="form-group"><label class="form-label">Duration (min) *</label><input class="form-input" type="number" min="1" id="f_badDuration" placeholder="45"/></div>
     </div>
-    <div class="form-row">
-      <div class="form-group"><label class="form-label">Partner Name</label><input class="form-input" id="f_badPartner" placeholder="e.g. Rahul"/></div>
-      <div class="form-group"><label class="form-label">Your Sets Won / Lost</label>
-        <div style="display:flex;gap:6px;">
-          <input class="form-input" type="number" min="0" id="f_badWon" placeholder="Won" style="width:50%"/>
-          <input class="form-input" type="number" min="0" id="f_badLost" placeholder="Lost" style="width:50%"/>
-        </div>
-      </div>
-    </div>
-    <div class="form-group"><label class="form-label">Notes</label><textarea class="form-textarea" id="f_badNotes" style="min-height:60px;" placeholder="How did it go?"></textarea></div>
-    <div class="form-actions"><button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="saveBadmintonLog()">Save</button></div>
+    <div class="form-group"><label class="form-label">Calories Burned</label><input class="form-input" type="number" min="0" id="f_badCalories" placeholder="e.g. 200"/></div>
+    <div class="form-actions"><button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="saveActivityLog('${activityId}','${escHtml(activityName)}')">Save</button></div>
   `);
 }
 
-function saveBadmintonLog() {
+function saveActivityLog(activityId = '', activityName = 'Badminton') {
   const duration = document.getElementById('f_badDuration')?.value;
   if (!duration) { showToast('Duration required','error'); return; }
   const data = {
     id: genId(),
     date: document.getElementById('f_badDate')?.value || today(),
     duration: parseInt(duration),
-    partner: document.getElementById('f_badPartner')?.value || '',
-    setsWon: parseInt(document.getElementById('f_badWon')?.value) || 0,
-    setsLost: parseInt(document.getElementById('f_badLost')?.value) || 0,
-    notes: document.getElementById('f_badNotes')?.value || '',
+    calories: parseInt(document.getElementById('f_badCalories')?.value) || 0,
   };
-  STATE.workout.badmintonLogs.push(data);
-  save(); closeModal(); renderWorkoutToday(); renderBadminton(); renderWorkoutHistory(); renderDashboard();
-  showToast('Badminton session logged!', 'success');
+  if (!activityId) {
+    // Badminton log
+    STATE.workout.badmintonLogs.push(data);
+  } else {
+    // Custom activity log
+    if (!STATE.workout.activityLogs) STATE.workout.activityLogs = [];
+    STATE.workout.activityLogs.push({...data, activityId, activityName});
+  }
+  save(); closeModal(); renderWorkoutToday(); renderActivities(); renderWorkoutHistory(); renderDashboard();
+  showToast(`${activityName} session logged!`, 'success');
+}
+
+function deleteActivityLog(id, source) {
+  if (source === 'badminton') {
+    STATE.workout.badmintonLogs = STATE.workout.badmintonLogs.filter(b => b.id !== id);
+  } else {
+    STATE.workout.activityLogs = (STATE.workout.activityLogs||[]).filter(a => a.id !== id);
+  }
+  save(); renderActivities(); renderWorkoutToday(); renderDashboard();
+  showToast('Deleted', 'info');
+}
+
+function openAddCustomActivity() {
+  openModal('🏃 Add Custom Sport/Activity', `
+    <div class="form-group"><label class="form-label">Activity Name *</label><input class="form-input" id="f_actName" placeholder="e.g. Cricket, Running, Jogging, Football"/></div>
+    <div class="form-group"><label class="form-label">Emoji</label><input class="form-input" id="f_actEmoji" value="🏃" style="width:60px;"/></div>
+    <div class="form-actions"><button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="saveCustomActivity()">Add</button></div>
+  `);
+}
+
+function saveCustomActivity() {
+  const name = document.getElementById('f_actName')?.value?.trim();
+  if (!name) { showToast('Name required','error'); return; }
+  if (!STATE.workout.customActivities) STATE.workout.customActivities = [];
+  STATE.workout.customActivities.push({ id: genId(), name, emoji: document.getElementById('f_actEmoji')?.value || '🏃' });
+  save(); closeModal(); renderActivities(); renderWorkoutToday();
+  showToast('Activity added!', 'success');
+}
+
+function deleteCustomActivity(id) {
+  STATE.workout.customActivities = (STATE.workout.customActivities||[]).filter(a => a.id !== id);
+  save(); renderActivities(); renderWorkoutToday();
+  showToast('Removed', 'info');
+}
+
+// Activity checklist for daily tab
+function renderTodayActivityChecklist(td) {
+  const el = document.getElementById('todayActivityChecklist');
+  if (!el) return;
+  
+  // Build list: Badminton (always) + custom activities
+  const activities = [
+    { id: '_badminton', name: 'Badminton', emoji: '🏸', type: 'badminton' },
+    ...(STATE.workout.customActivities||[]).map(a => ({...a, type: 'custom'}))
+  ];
+  
+  if (activities.length === 0) {
+    el.innerHTML = `<div class="empty-state"><span>🏃</span><p>No activities configured.</p></div>`;
+    return;
+  }
+  
+  el.innerHTML = activities.map(act => {
+    let logged = false;
+    if (act.type === 'badminton') {
+      logged = STATE.workout.badmintonLogs.some(b => b.date === td);
+    } else {
+      logged = (STATE.workout.activityLogs||[]).some(a => a.activityId === act.id && a.date === td);
+    }
+    return `<div class="exercise-row ${logged?'done-row':''}" style="cursor:pointer;" onclick="${logged ? `unlogActivity('${act.id}','${act.type}','${td}')` : `logActivityFromDaily('${act.id}','${escHtml(act.name)}','${act.type}')` }">
+      <span style="font-size:18px;">${act.emoji}</span>
+      <div class="ex-name">${escHtml(act.name)}</div>
+      <div style="flex-grow:1;"></div>
+      ${logged ? `<span style="color:var(--green);font-weight:600;font-size:12px;">Logged ✓</span>` : `<span style="color:var(--text-muted);font-size:12px;">Tap to log</span>`}
+      <div class="exercise-done-check ${logged?'done':''}" style="pointer-events:none;">${logged?'✓':''}</div>
+    </div>`;
+  }).join('');
+}
+
+function logActivityFromDaily(actId, actName, type) {
+  if (type === 'badminton') {
+    openLogBadminton('Badminton', '');
+  } else {
+    openLogBadminton(actName, actId);
+  }
+}
+
+function unlogActivity(actId, type, td) {
+  if (type === 'badminton') {
+    const log = STATE.workout.badmintonLogs.find(b => b.date === td);
+    if (log) {
+      STATE.workout.badmintonLogs = STATE.workout.badmintonLogs.filter(b => b.id !== log.id);
+    }
+  } else {
+    STATE.workout.activityLogs = (STATE.workout.activityLogs||[]).filter(a => !(a.activityId === actId && a.date === td));
+  }
+  save(); renderWorkoutToday(); renderDashboard();
+  showToast('Activity unlogged', 'info');
 }
 
 // ---- HISTORY ----
@@ -1880,6 +2059,7 @@ let budgetFilter = 'all';
 window.currentBudgetMonth = null;
 
 function renderBudget() {
+  const cur = STATE.currency?.symbol || '₹';
   if (!window.currentBudgetMonth) window.currentBudgetMonth = today().substring(0, 7);
   const isCurrentMonth = window.currentBudgetMonth === today().substring(0, 7);
   
@@ -1899,9 +2079,9 @@ function renderBudget() {
   const remaining = limit - total;
   const pct = limit > 0 ? Math.min(100, Math.round(total/limit*100)) : 0;
   
-  document.getElementById('budgetLimit').textContent = `₹${limit.toFixed(2)}`;
-  document.getElementById('budgetSpent').textContent = `₹${total.toFixed(2)}`;
-  document.getElementById('budgetRemaining').textContent = `₹${remaining.toFixed(2)}`;
+  document.getElementById('budgetLimit').textContent = `${cur}${limit.toFixed(2)}`;
+  document.getElementById('budgetSpent').textContent = `${cur}${total.toFixed(2)}`;
+  document.getElementById('budgetRemaining').textContent = `${cur}${remaining.toFixed(2)}`;
   document.getElementById('budgetRemaining').className = `budget-value ${remaining>=0?'green':'red'}`;
   document.getElementById('budgetProgressFill').style.width = `${pct}%`;
   document.getElementById('budgetPct').textContent = `${pct}% used`;
@@ -1912,7 +2092,7 @@ function renderBudget() {
   let daysForAvg = isCurrentMonth ? new Date().getDate() : totalDaysInMonth;
   const dailyAvg = total / daysForAvg;
   const avgEl = document.getElementById('budgetDailyAvg');
-  if (avgEl) avgEl.textContent = `₹${dailyAvg.toFixed(2)}`;
+  if (avgEl) avgEl.textContent = `${cur}${dailyAvg.toFixed(2)}`;
   
   let safeDaily = 0;
   if (isCurrentMonth && remaining > 0) {
@@ -1921,7 +2101,7 @@ function renderBudget() {
   }
   const safeEl = document.getElementById('budgetSafeDaily');
   if (safeEl) {
-    safeEl.textContent = `₹${safeDaily.toFixed(2)}`;
+    safeEl.textContent = `${cur}${safeDaily.toFixed(2)}`;
     safeEl.className = `budget-value ${remaining >= 0 ? 'green' : 'red'}`;
   }
   
@@ -1935,17 +2115,18 @@ function renderBudget() {
   tbody.innerHTML = rows.map(e=>{
     let catText = escHtml(e.category);
     let displayCat = catEmoji[e.category] ? `${catEmoji[e.category]} ${catText}` : catText;
-    return `<tr><td>${escHtml(e.desc)}</td><td><span class="tag tag-in-progress">${displayCat}</span></td><td><strong>₹${parseFloat(e.amount).toFixed(2)}</strong></td><td>${formatDate(e.date)}</td><td><div class="table-actions"><button class="icon-btn" onclick="editExpense('${e.id}')">✏️</button><button class="icon-btn del" onclick="deleteExpense('${e.id}')">🗑️</button></div></td></tr>`;
+    return `<tr><td>${escHtml(e.desc)}</td><td><span class="tag tag-in-progress">${displayCat}</span></td><td><strong>${cur}${parseFloat(e.amount).toFixed(2)}</strong></td><td>${formatDate(e.date)}</td><td><div class="table-actions"><button class="icon-btn" onclick="editExpense('${e.id}')">✏️</button><button class="icon-btn del" onclick="deleteExpense('${e.id}')">🗑️</button></div></td></tr>`;
   }).join('');
 }
 function deleteExpense(id) { STATE.budget.expenses=STATE.budget.expenses.filter(e=>e.id!==id); save(); renderBudget(); showToast('Removed','info'); }
 function editExpense(id) { const e = STATE.budget.expenses.find(x=>x.id===id); openModal('Edit Expense', buildExpenseForm(e)); }
 function buildExpenseForm(e = {}) {
+  const cur = STATE.currency?.symbol || '₹';
   const catOpts = STATE.categories.budget.map(c => `<option value="${escHtml(c)}" ${e.category===c?'selected':''}>${escHtml(c)}</option>`).join('');
   return `
     <div class="form-group"><label class="form-label">Description *</label><input class="form-input" id="f_desc" value="${escHtml(e.desc||'')}" placeholder="What did you spend on?"/></div>
     <div class="form-row">
-      <div class="form-group"><label class="form-label">Amount (₹) *</label><input class="form-input" type="number" step="0.01" min="0" id="f_amount" value="${e.amount||''}" placeholder="0.00"/></div>
+      <div class="form-group"><label class="form-label">Amount (${cur}) *</label><input class="form-input" type="number" step="0.01" min="0" id="f_amount" value="${e.amount||''}" placeholder="0.00"/></div>
       <div class="form-group"><label class="form-label">Category</label><select class="form-select" id="f_cat">${catOpts}</select></div>
     </div>
     <div class="form-group"><label class="form-label">Date</label><input class="form-input" type="date" id="f_date" value="${e.date||today()}"/></div>
@@ -1959,7 +2140,8 @@ function saveExpense(id = '') {
   save(); closeModal(); renderBudget(); renderDashboard(); showToast(id?'Updated!':'Expense added!','success');
 }
 function buildBudgetLimitForm() {
-  return `<div class="form-group"><label class="form-label">Monthly Budget (₹)</label><input class="form-input" type="number" step="100" min="0" id="f_limit" placeholder="e.g. 15000" value="${STATE.budget.limit||''}"/></div>
+  const cur = STATE.currency?.symbol || '₹';
+  return `<div class="form-group"><label class="form-label">Monthly Budget (${cur})</label><input class="form-input" type="number" step="100" min="0" id="f_limit" placeholder="e.g. 15000" value="${STATE.budget.limit||''}"/></div>
     <div class="form-actions"><button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="saveBudgetLimit()">Save</button></div>`;
 }
 function saveBudgetLimit() {
@@ -1975,6 +2157,7 @@ function openBudgetHistoryModal() {
   months.sort((a,b)=>b.localeCompare(a));
   
   const limit = parseFloat(STATE.budget.limit||0);
+  const cur = STATE.currency?.symbol || '₹';
   
   const html = `
     <div style="display:flex; flex-direction:column; gap:8px; max-height: 400px; overflow-y:auto;">
@@ -1988,7 +2171,7 @@ function openBudgetHistoryModal() {
           <div class="note-card" style="min-height:auto; padding:12px 16px; cursor:pointer;" onclick="setBudgetMonth('${m}')">
             <div style="display:flex; justify-content:space-between; align-items:center;">
               <span style="font-weight:700;">${monthName} ${isCurrent ? '<span class="tag tag-done" style="margin-left:8px; font-size:10px; padding:2px 6px;">Current</span>' : ''}</span>
-              <span style="font-size:14px; font-weight:600; color: ${spent>limit?'var(--red)':'var(--green)'}">₹${spent.toFixed(2)}</span>
+              <span style="font-size:14px; font-weight:600; color: ${spent>limit?'var(--red)':'var(--green)'}">${cur}${spent.toFixed(2)}</span>
             </div>
             <div style="margin-top:8px; display:flex; align-items:center; gap:12px;">
               <div class="budget-progress-wrap" style="flex:1; margin:0; height:6px;">
@@ -2249,12 +2432,16 @@ function openProfileModal() {
     </div>
 
     <div class="divider"></div>
-    <div class="form-group" style="margin-top:16px; margin-bottom: 16px;">
+      <div class="form-group" style="margin-top:16px; margin-bottom: 16px;">
       <label class="form-label">Preferences</label>
       <div style="display:flex; align-items:center; gap:12px; margin-top:8px;">
         <span style="font-size:14px; color:var(--text-secondary);">Notification Volume:</span>
         <input type="range" min="0" max="1" step="0.1" value="${STATE.notificationVolume !== undefined ? STATE.notificationVolume : 1.0}" 
                oninput="updateNotificationVolume(this.value)" style="flex-grow:1; cursor:pointer;" />
+      </div>
+      <div style="display:flex;gap:8px;margin-top:12px;">
+        <button class="btn btn-outline" style="flex:1" onclick="closeModal(); openTimezoneModal();">🌐 Timezone</button>
+        <button class="btn btn-outline" style="flex:1" onclick="closeModal(); openCurrencyModal();">💱 Currency</button>
       </div>
     </div>
 
@@ -2438,11 +2625,10 @@ function renderAll() {
   renderWorkoutToday();
   renderWorkoutPlan();
   renderMachines();
-  renderBadminton();
+  renderActivities();
   renderWorkoutHistory();
   renderBudget();
   renderNotes();
-  renderCompleted();
   updateSemesterUI();
   if (STATE.theme==='light') document.body.classList.add('light'); else document.body.classList.remove('light');
 }
@@ -2516,11 +2702,12 @@ function init() {
   load();
   if (STATE.theme==='light') document.body.classList.add('light');
 
-  // Current date — IST (Delhi)
+  // Current date — timezone aware
   function updateISTClock() {
+    const tz = STATE.timezone || 'Asia/Kolkata';
     const now = new Date();
-    document.getElementById('currentDate').textContent = now.toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
-    document.getElementById('liveClock').textContent = now.toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+    document.getElementById('currentDate').textContent = now.toLocaleDateString('en-IN', { timeZone: tz, weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+    document.getElementById('liveClock').textContent = now.toLocaleTimeString('en-IN', { timeZone: tz, hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
   }
   updateISTClock();
   setInterval(updateISTClock, 1000);
@@ -2578,7 +2765,7 @@ function init() {
     else if (v==='planner') openModal('Add Study Session',buildSessionForm(),()=>saveSession(''));
     else if (v==='workout') {
       if (STATE.workoutSubTab==='machines') openModal('Add Machine',buildMachineForm(),()=>saveMachine(''));
-      else if (STATE.workoutSubTab==='badminton') openLogBadminton();
+      else if (STATE.workoutSubTab==='activities') openLogBadminton();
       else if (STATE.workoutSubTab==='plan') addWorkoutPlan();
       else openLogGym('');
     } else openModal('Add Assignment',buildAssignmentForm(),()=>saveAssignment(''));
@@ -2620,12 +2807,31 @@ function init() {
   }
 
   // Planner
-  document.getElementById('prevDay').addEventListener('click', () => { STATE.dayOffset = (STATE.dayOffset||0) - 2; renderPlanner(); });
-  document.getElementById('nextDay').addEventListener('click', () => { STATE.dayOffset = (STATE.dayOffset||0) + 2; renderPlanner(); });
-  document.getElementById('addSessionBtn').addEventListener('click', () => {
+  document.getElementById('prevDay')?.addEventListener('click', () => { STATE.dayOffset = (STATE.dayOffset||0) - 2; renderPlanner(); });
+  document.getElementById('nextDay')?.addEventListener('click', () => { STATE.dayOffset = (STATE.dayOffset||0) + 2; renderPlanner(); });
+  document.getElementById('addSessionBtn')?.addEventListener('click', () => {
     const d = new Date(); d.setDate(d.getDate() + (STATE.dayOffset||0));
     const dateStr = d.toISOString().split('T')[0];
     openModal('Add Task', buildSessionForm({date: dateStr}), () => saveSession(''));
+  });
+  document.getElementById('randomizeTopicBtn')?.addEventListener('click', () => {
+    const activeCourses = STATE.courses.filter(c => c.status === 'active');
+    let incompleteTopics = [];
+    activeCourses.forEach(c => {
+      (c.syllabus || []).forEach(s => {
+        if (!s.done) incompleteTopics.push({ course: c, topic: s });
+      });
+    });
+    if (incompleteTopics.length === 0) {
+      showToast('No incomplete topics found in active courses!', 'warning');
+      return;
+    }
+    const rand = incompleteTopics[Math.floor(Math.random() * incompleteTopics.length)];
+    const taskName = `[Random] ${rand.course.name} - ${rand.topic.name}`;
+    STATE.todos.push({ id: genId(), text: taskName, done: false, priority: 'high' });
+    save(); renderTodos(); renderDashboard();
+    document.querySelector('#plannerSubTabs [data-subtab="planner-todo"]')?.click();
+    showToast(`Added to To-Do: ${rand.topic.name}`, 'success');
   });
 
   // Planner Tabs
@@ -2714,9 +2920,9 @@ function init() {
     setWorkoutSubTab(btn.dataset.subtab);
   });
   document.getElementById('logGymBtn').addEventListener('click',()=>openLogGym(''));
-  document.getElementById('logBadmintonBtn').addEventListener('click',openLogBadminton);
   document.getElementById('addMachineBtn').addEventListener('click',()=>openModal('Add Machine',buildMachineForm(),()=>saveMachine('')));
-  document.getElementById('addBadmintonBtn').addEventListener('click',openLogBadminton);
+  document.getElementById('addBadmintonBtn').addEventListener('click',()=>openLogBadminton());
+  document.getElementById('addCustomActivityBtn')?.addEventListener('click',openAddCustomActivity);
   document.getElementById('addPlanBtn').addEventListener('click',addWorkoutPlan);
   document.getElementById('setActivePlanBtn').addEventListener('click',setActivePlan);
   document.getElementById('activePlanSelect').addEventListener('change',()=>renderWorkoutPlan());
@@ -2730,6 +2936,11 @@ function init() {
     const btn=e.target.closest('.filter-btn[data-history-filter]'); if (!btn) return;
     document.querySelectorAll('#historyFilterGroup .filter-btn').forEach(b=>b.classList.remove('active'));
     btn.classList.add('active'); STATE.historyFilter=btn.dataset.historyFilter; renderWorkoutHistory();
+  });
+  document.getElementById('activityFilterGroup')?.addEventListener('click',e=>{
+    const btn=e.target.closest('.filter-btn[data-activity-filter]'); if (!btn) return;
+    document.querySelectorAll('#activityFilterGroup .filter-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active'); STATE.activityFilter=btn.dataset.activityFilter; renderActivities();
   });
 
   // Budget
@@ -2759,8 +2970,13 @@ function init() {
     document.getElementById('loginOverlay').style.display = 'none';
   });
 
-  // Semester Stats Click
-  document.getElementById('semesterStatsCard')?.addEventListener('click', openSemesterStatsModal);
+  // Semester Stats Click — open semester menu instead of stats modal
+  document.getElementById('semesterStatsCard')?.addEventListener('click', openSemesterMenu);
+
+  // Daily study prompt and midnight detection
+  checkDailyStudyPrompt();
+  _lastKnownDay = today();
+  setInterval(checkMidnightReset, 60000);
 
   // Init Auth & Render
   initAuth();
@@ -2769,6 +2985,16 @@ function init() {
 // ==================== DASHBOARD CUSTOMIZATION ====================
 function getTileHTML(tileId) {
   switch(tileId) {
+    case 'randomTopic':
+      return `<div class="card">
+          <div class="card-header">
+            <h2>🎲 Random Study Topic</h2>
+          </div>
+          <div id="randomTopicArea" style="padding:16px; text-align:center;">
+            <div id="randomTopicResult" style="font-size:14px; color:var(--text-muted); margin-bottom:12px;">Click the button to get a random topic to study!</div>
+            <button class="btn btn-primary" onclick="getRandomStudyTopic()" style="padding:10px 24px;">🎲 Randomise Topic</button>
+          </div>
+        </div>`;
     case 'deadlines':
       return `<div class="card">
           <div class="card-header">
@@ -2969,6 +3195,710 @@ function saveSemesterStats() {
   save();
   showToast('Stats saved!', 'success');
   closeModal();
+}
+
+// ==================== RANDOM STUDY TOPIC ====================
+function getRandomStudyTopic() {
+  const activeCourses = STATE.courses.filter(c => c.status !== 'completed' && c.status !== 'upcoming');
+  if (activeCourses.length === 0) {
+    document.getElementById('randomTopicResult').innerHTML = `<div style="color:var(--orange);">No active courses found. Add some courses first!</div>`;
+    return;
+  }
+  const course = activeCourses[Math.floor(Math.random() * activeCourses.length)];
+  let topic = null;
+  if (course.syllabus && course.syllabus.length > 0) {
+    const undone = course.syllabus.filter(s => !s.done);
+    const pool = undone.length > 0 ? undone : course.syllabus;
+    topic = pool[Math.floor(Math.random() * pool.length)];
+  }
+  const el = document.getElementById('randomTopicResult');
+  el.innerHTML = `
+    <div style="background:var(--bg-tertiary); padding:16px; border-radius:12px; border-left:4px solid ${course.color||'var(--accent)'}; text-align:left;">
+      <div style="font-size:11px; text-transform:uppercase; letter-spacing:1px; color:var(--text-muted); margin-bottom:4px;">Course</div>
+      <div style="font-size:16px; font-weight:700; color:var(--text-primary); margin-bottom:8px;">${escHtml(course.name)}</div>
+      ${topic ? `<div style="font-size:11px; text-transform:uppercase; letter-spacing:1px; color:var(--text-muted); margin-bottom:4px;">Topic</div>
+      <div style="font-size:15px; font-weight:600; color:var(--accent);">${escHtml(topic.topic||'Untitled')}</div>
+      <div style="margin-top:6px; font-size:12px; color:var(--text-muted);">Difficulty: ${topic.difficulty||'medium'} ${topic.done ? '| ✅ Done' : '| ⏳ Pending'}</div>` : `<div style="font-size:13px; color:var(--text-muted);">No syllabus topics added for this course.</div>`}
+    </div>`;
+  el.style.animation = 'none'; el.offsetHeight; el.style.animation = 'fadeIn 0.3s ease';
+}
+
+// ==================== STATS ====================
+function renderStats() {
+  const statsSubTabs = document.getElementById('statsSubTabs');
+  if (statsSubTabs && !statsSubTabs._bound) {
+    statsSubTabs._bound = true;
+    statsSubTabs.addEventListener('click', e => {
+      const btn = e.target.closest('.sub-tab');
+      if (!btn) return;
+      statsSubTabs.querySelectorAll('.sub-tab').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      document.querySelectorAll('#view-stats .subtab-panel').forEach(p => p.classList.remove('active'));
+      document.getElementById(`subtab-${btn.dataset.subtab}`)?.classList.add('active');
+      STATE.statsSubTab = btn.dataset.subtab;
+      save();
+      renderStatsTab(btn.dataset.subtab);
+    });
+  }
+  const activeTab = STATE.statsSubTab || 'stats-study';
+  renderStatsTab(activeTab);
+}
+
+function renderStatsTab(tab) {
+  switch(tab) {
+    case 'stats-study': renderStudyStats(); break;
+    case 'stats-assignments': renderAssignmentStats(); break;
+    case 'stats-workout': renderWorkoutStats(); break;
+    case 'stats-semester': renderSemesterStats(); break;
+  }
+}
+
+function drawBarChart(canvasId, labels, data, color, label) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const dpr = window.devicePixelRatio || 1;
+  const w = canvas.parentElement.clientWidth || 600;
+  const h = 250;
+  canvas.width = w * dpr; canvas.height = h * dpr;
+  canvas.style.width = w + 'px'; canvas.style.height = h + 'px';
+  ctx.scale(dpr, dpr);
+  ctx.clearRect(0, 0, w, h);
+
+  const maxVal = Math.max(...data, 1);
+  const barW = Math.max(8, Math.min(30, (w - 60) / data.length - 4));
+  const startX = 40;
+  const chartH = h - 50;
+
+  // Grid lines
+  ctx.strokeStyle = getComputedStyle(document.body).getPropertyValue('--border') || '#333';
+  ctx.lineWidth = 0.5;
+  for (let i = 0; i <= 4; i++) {
+    const y = 10 + (chartH / 4) * i;
+    ctx.beginPath(); ctx.moveTo(startX, y); ctx.lineTo(w - 10, y); ctx.stroke();
+    ctx.fillStyle = getComputedStyle(document.body).getPropertyValue('--text-muted') || '#666';
+    ctx.font = '10px Inter';
+    ctx.fillText(Math.round(maxVal * (4 - i) / 4), 2, y + 4);
+  }
+
+  // Bars
+  data.forEach((val, i) => {
+    const barH = (val / maxVal) * chartH;
+    const x = startX + i * (barW + 4);
+    const y = 10 + chartH - barH;
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.roundRect(x, y, barW, barH, 3);
+    ctx.fill();
+    // Label
+    ctx.fillStyle = getComputedStyle(document.body).getPropertyValue('--text-muted') || '#666';
+    ctx.font = '9px Inter';
+    ctx.save(); ctx.translate(x + barW/2, h - 4); ctx.rotate(-Math.PI/4);
+    ctx.fillText(labels[i] || '', 0, 0);
+    ctx.restore();
+  });
+}
+
+function drawLineChart(canvasId, labels, data, color, label) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const dpr = window.devicePixelRatio || 1;
+  const w = canvas.parentElement.clientWidth || 600;
+  const h = 250;
+  canvas.width = w * dpr; canvas.height = h * dpr;
+  canvas.style.width = w + 'px'; canvas.style.height = h + 'px';
+  ctx.scale(dpr, dpr);
+  ctx.clearRect(0, 0, w, h);
+
+  if (data.length === 0) return;
+
+  const maxVal = Math.max(...data, 1);
+  const startX = 40;
+  const chartW = w - 50;
+  const chartH = h - 50;
+  const stepX = chartW / Math.max(1, data.length - 1);
+
+  // Grid lines
+  ctx.strokeStyle = getComputedStyle(document.body).getPropertyValue('--border') || '#333';
+  ctx.lineWidth = 0.5;
+  for (let i = 0; i <= 4; i++) {
+    const y = 10 + (chartH / 4) * i;
+    ctx.beginPath(); ctx.moveTo(startX, y); ctx.lineTo(w - 10, y); ctx.stroke();
+    ctx.fillStyle = getComputedStyle(document.body).getPropertyValue('--text-muted') || '#666';
+    ctx.font = '10px Inter';
+    ctx.fillText(Math.round(maxVal * (4 - i) / 4), 2, y + 4);
+  }
+
+  // Line
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 3;
+  ctx.lineJoin = 'round';
+  ctx.beginPath();
+  data.forEach((val, i) => {
+    const x = startX + i * stepX;
+    const y = 10 + chartH - ((val / maxVal) * chartH);
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  });
+  ctx.stroke();
+
+  // Points and Labels
+  data.forEach((val, i) => {
+    const x = startX + i * stepX;
+    const y = 10 + chartH - ((val / maxVal) * chartH);
+    ctx.fillStyle = getComputedStyle(document.body).getPropertyValue('--bg-card') || '#fff';
+    ctx.beginPath(); ctx.arc(x, y, 4, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+
+    ctx.fillStyle = getComputedStyle(document.body).getPropertyValue('--text-muted') || '#666';
+    ctx.font = '9px Inter';
+    ctx.save(); ctx.translate(x, h - 4); ctx.rotate(-Math.PI/4);
+    ctx.fillText(labels[i] || '', 0, 0);
+    ctx.restore();
+  });
+}
+
+function drawPieChart(canvasId, labels, data, color, label) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const dpr = window.devicePixelRatio || 1;
+  const w = canvas.parentElement.clientWidth || 600;
+  const h = 250;
+  canvas.width = w * dpr; canvas.height = h * dpr;
+  canvas.style.width = w + 'px'; canvas.style.height = h + 'px';
+  ctx.scale(dpr, dpr);
+  ctx.clearRect(0, 0, w, h);
+
+  const total = data.reduce((a,b) => a+b, 0);
+  if (total === 0) {
+    ctx.fillStyle = getComputedStyle(document.body).getPropertyValue('--text-muted') || '#666';
+    ctx.font = '14px Inter';
+    ctx.fillText('No data', w/2 - 25, h/2);
+    return;
+  }
+
+  const cx = w/2;
+  const cy = h/2;
+  const r = Math.min(w, h)/2 - 30;
+  let startAngle = -Math.PI/2;
+
+  // Colors (generate slightly different shades of the base color if needed, or use a palette)
+  const colors = [color, '#4a90e2', '#4caf7d', '#f0965a', '#e8c44a', '#e05c5c', '#20b2aa', '#9b59b6'];
+
+  data.forEach((val, i) => {
+    if (val === 0) return;
+    const sliceAngle = (val / total) * 2 * Math.PI;
+    ctx.fillStyle = colors[i % colors.length];
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.arc(cx, cy, r, startAngle, startAngle + sliceAngle);
+    ctx.closePath();
+    ctx.fill();
+
+    // Draw label
+    if (val / total > 0.05) { // Only label slices > 5%
+      const midAngle = startAngle + sliceAngle / 2;
+      const lx = cx + Math.cos(midAngle) * (r * 0.7);
+      const ly = cy + Math.sin(midAngle) * (r * 0.7);
+      ctx.fillStyle = '#fff';
+      ctx.font = 'bold 11px Inter';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(`${labels[i]} (${Math.round((val/total)*100)}%)`, lx, ly);
+    }
+    
+    startAngle += sliceAngle;
+  });
+}
+
+function updateStatsConfig(key, value) {
+  if (!STATE.statsConfig) STATE.statsConfig = { type: 'bar', range: 'month' };
+  STATE.statsConfig[key] = value;
+  save();
+  renderStatsTab(STATE.statsSubTab || 'stats-study');
+}
+
+function getStatsDateRange(rangeStr) {
+  const now = new Date();
+  if (rangeStr === 'today') {
+    return 1;
+  } else if (rangeStr === 'week') {
+    return 7;
+  } else if (rangeStr === 'month') {
+    return 30;
+  } else if (rangeStr === 'year') {
+    return 365;
+  }
+  return 365; // 'all' roughly 1 year for performance
+}
+
+function drawConfiguredChart(canvasId, labels, data, defaultColor, label) {
+  const type = STATE.statsConfig?.type || 'bar';
+  if (type === 'pie') drawPieChart(canvasId, labels, data, defaultColor, label);
+  else if (type === 'line') drawLineChart(canvasId, labels, data, defaultColor, label);
+  else drawBarChart(canvasId, labels, data, defaultColor, label);
+}
+
+function renderStudyStats() {
+  const logs = STATE.studyLogs || [];
+  const range = getStatsDateRange(STATE.statsConfig?.range);
+  const dataPoints = [];
+  
+  for (let i = range - 1; i >= 0; i--) {
+    const d = new Date(); d.setDate(d.getDate() - i);
+    const ds = d.toISOString().split('T')[0];
+    const log = logs.find(l => l.date === ds);
+    const todosCompleted = STATE.todos.filter(t => t.completedAt && t.completedAt.split('T')[0] === ds).length;
+    dataPoints.push({ date: ds, hours: log ? log.hours : 0, todos: todosCompleted });
+  }
+
+  const totalHours = dataPoints.reduce((s,l) => s + l.hours, 0);
+  const avgHours = totalHours / Math.max(1, range);
+  const maxDay = dataPoints.reduce((m,l) => l.hours > m.hours ? l : m, {hours:0});
+
+  document.getElementById('studyStatsCards').innerHTML = `
+    <div class="stat-card stat-purple"><div class="stat-icon">📚</div><div class="stat-content"><div class="stat-value">${totalHours.toFixed(1)}h</div><div class="stat-label">Total (${range} days)</div></div></div>
+    <div class="stat-card stat-blue"><div class="stat-icon">📈</div><div class="stat-content"><div class="stat-value">${avgHours.toFixed(1)}h</div><div class="stat-label">Daily Average</div></div></div>
+    <div class="stat-card stat-green"><div class="stat-icon">🔥</div><div class="stat-content"><div class="stat-value">${maxDay.hours}h</div><div class="stat-label">Best Day</div></div></div>
+    <div class="stat-card stat-orange"><div class="stat-icon">📅</div><div class="stat-content"><div class="stat-value">${dataPoints.filter(l=>l.hours>0).length}</div><div class="stat-label">Days Studied</div></div></div>
+  `;
+  
+  drawConfiguredChart('studyHoursChart', dataPoints.map(l => l.date.slice(5)), dataPoints.map(l => l.hours), '#7c5cbf', 'Hours');
+  drawConfiguredChart('todoStatsChart', dataPoints.map(l => l.date.slice(5)), dataPoints.map(l => l.todos), '#4caf7d', 'To-Dos');
+}
+
+function renderAssignmentStats() {
+  const total = STATE.assignments.length + (STATE.completedAssignments||[]).length;
+  const done = (STATE.completedAssignments||[]).length;
+  const pending = STATE.assignments.filter(a => a.status !== 'done').length;
+  const inProg = STATE.assignments.filter(a => a.status === 'in-progress').length;
+
+  document.getElementById('assignmentStatsCards').innerHTML = `
+    <div class="stat-card stat-purple"><div class="stat-icon">📝</div><div class="stat-content"><div class="stat-value">${total}</div><div class="stat-label">Total Assignments</div></div></div>
+    <div class="stat-card stat-green"><div class="stat-icon">✅</div><div class="stat-content"><div class="stat-value">${done}</div><div class="stat-label">Completed</div></div></div>
+    <div class="stat-card stat-orange"><div class="stat-icon">⏳</div><div class="stat-content"><div class="stat-value">${pending}</div><div class="stat-label">Pending</div></div></div>
+    <div class="stat-card stat-blue"><div class="stat-icon">🛠️</div><div class="stat-content"><div class="stat-value">${inProg}</div><div class="stat-label">In Progress</div></div></div>
+  `;
+
+  // Completion over time (by completion date)
+  const completed = (STATE.completedAssignments||[]).filter(a => a.completedAt).sort((a,b) => a.completedAt.localeCompare(b.completedAt));
+  const range = getStatsDateRange(STATE.statsConfig?.range);
+  const dataPoints = [];
+  for (let i = range - 1; i >= 0; i--) {
+    const d = new Date(); d.setDate(d.getDate() - i);
+    const ds = d.toISOString().split('T')[0];
+    dataPoints.push({ date: ds, count: completed.filter(a => a.completedAt && a.completedAt.split('T')[0] === ds).length });
+  }
+  drawConfiguredChart('assignmentChart', dataPoints.map(l => l.date.slice(5)), dataPoints.map(l => l.count), '#4caf7d', 'Completed');
+}
+
+function renderWorkoutStats() {
+  const gymLogs = STATE.workout.gymLogs || [];
+  const badLogs = STATE.workout.badmintonLogs || [];
+  const actLogs = STATE.workout.activityLogs || [];
+  const totalGym = gymLogs.length;
+  const totalBad = badLogs.length;
+  const totalAct = actLogs.length;
+  const totalCal = gymLogs.reduce((s,g)=>s+(g.calories||0),0) + badLogs.reduce((s,b)=>s+(b.calories||0),0) + actLogs.reduce((s,a)=>s+(a.calories||0),0);
+
+  document.getElementById('workoutStatsCards').innerHTML = `
+    <div class="stat-card stat-blue"><div class="stat-icon">🏋️</div><div class="stat-content"><div class="stat-value">${totalGym}</div><div class="stat-label">Gym Sessions</div></div></div>
+    <div class="stat-card stat-green"><div class="stat-icon">🏸</div><div class="stat-content"><div class="stat-value">${totalBad}</div><div class="stat-label">Badminton</div></div></div>
+    <div class="stat-card stat-purple"><div class="stat-icon">🏃</div><div class="stat-content"><div class="stat-value">${totalAct}</div><div class="stat-label">Other Activities</div></div></div>
+    <div class="stat-card stat-orange"><div class="stat-icon">🔥</div><div class="stat-content"><div class="stat-value">${totalCal}</div><div class="stat-label">Total Calories</div></div></div>
+  `;
+
+  const range = getStatsDateRange(STATE.statsConfig?.range);
+  const dataPoints = [];
+  for (let i = range - 1; i >= 0; i--) {
+    const d = new Date(); d.setDate(d.getDate() - i);
+    const ds = d.toISOString().split('T')[0];
+    const gymMin = gymLogs.filter(g => g.date === ds).reduce((s,g) => s+(g.duration||0), 0);
+    const badMin = badLogs.filter(b => b.date === ds).reduce((s,b) => s+(b.duration||0), 0);
+    const actMin = actLogs.filter(a => a.date === ds).reduce((s,a) => s+(a.duration||0), 0);
+    dataPoints.push({ date: ds, mins: gymMin + badMin + actMin });
+  }
+  drawConfiguredChart('workoutChart', dataPoints.map(l => l.date.slice(5)), dataPoints.map(l => l.mins), '#4a90e2', 'Minutes');
+}
+
+function renderSemesterStats() {
+  const current = STATE.semester;
+  const prev = STATE.semesters || [];
+
+  document.getElementById('semesterStatsCards').innerHTML = `
+    <div class="stat-card stat-purple"><div class="stat-icon">🎓</div><div class="stat-content"><div class="stat-value">${escHtml(current.name||'Current')}</div><div class="stat-label">Current Semester</div></div></div>
+    <div class="stat-card stat-blue"><div class="stat-icon">📊</div><div class="stat-content"><div class="stat-value">${escHtml(current.marksLastInternals||'—')}</div><div class="stat-label">Internal Marks</div></div></div>
+    <div class="stat-card stat-green"><div class="stat-icon">🏆</div><div class="stat-content"><div class="stat-value">${escHtml(current.marksLastSemester||'—')}</div><div class="stat-label">Semester Grade</div></div></div>
+    <div class="stat-card stat-orange"><div class="stat-icon">📁</div><div class="stat-content"><div class="stat-value">${prev.length}</div><div class="stat-label">Past Semesters</div></div></div>
+  `;
+
+  // Draw comparison chart if we have previous semesters
+  const canvas = document.getElementById('semesterCompareChart');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  if (prev.length === 0) {
+    const dpr = window.devicePixelRatio || 1;
+    const w = canvas.parentElement.clientWidth || 600;
+    canvas.width = w * dpr; canvas.height = 250 * dpr;
+    canvas.style.width = w + 'px'; canvas.style.height = '250px';
+    ctx.scale(dpr, dpr);
+    ctx.clearRect(0, 0, w, 250);
+    ctx.fillStyle = getComputedStyle(document.body).getPropertyValue('--text-muted') || '#666';
+    ctx.font = '14px Inter';
+    ctx.textAlign = 'center';
+    ctx.fillText('No previous semesters to compare. Archive your current semester to see comparisons.', w/2, 125);
+    return;
+  }
+  const sems = [...prev, {name: current.name, marksLastSemester: current.marksLastSemester}];
+  const labels = sems.map(s => s.name || 'Sem');
+  const values = sems.map(s => parseFloat(s.marksLastSemester) || 0);
+  drawConfiguredChart('semesterCompareChart', labels, values, '#f0965a', 'Score');
+}
+
+// ==================== DAILY STUDY HOURS POPUP ====================
+function checkDailyStudyPrompt() {
+  const td = today();
+  if (STATE.lastStudyPromptDate === td) return;
+  // Check if yesterday's study hours are logged
+  const d = new Date(); d.setDate(d.getDate() - 1);
+  const yesterday = d.toISOString().split('T')[0];
+  const logged = (STATE.studyLogs||[]).find(l => l.date === yesterday);
+  if (!logged) {
+    // Show popup
+    setTimeout(() => {
+      openModal('📚 How much did you study yesterday?', `
+        <div style="text-align:center; margin-bottom:20px;">
+          <div style="font-size:48px; margin-bottom:8px;">📚</div>
+          <div style="font-size:14px; color:var(--text-muted);">Log your study hours for ${formatDate(yesterday)}</div>
+        </div>
+        <div class="form-group"><label class="form-label">Hours Studied *</label><input class="form-input" type="number" min="0" max="24" step="0.5" id="f_studyHours" placeholder="e.g. 4"/></div>
+        <div class="form-actions">
+          <button class="btn btn-outline" onclick="skipStudyPrompt()">Skip</button>
+          <button class="btn btn-primary" onclick="saveStudyLog('${yesterday}')">Save</button>
+        </div>
+      `);
+    }, 1500);
+  }
+  STATE.lastStudyPromptDate = td;
+  save();
+}
+
+function skipStudyPrompt() { closeModal(); }
+
+function openStudyLogsModal() {
+  const logs = [...(STATE.studyLogs || [])].sort((a,b) => b.date.localeCompare(a.date));
+  const html = `
+    <div style="display:flex; flex-direction:column; gap:8px; max-height:400px; overflow-y:auto;">
+      ${logs.length === 0 ? '<div class="empty-state"><span>📭</span><p>No study logs found.</p></div>' : 
+        logs.map(l => `
+          <div class="note-card" style="min-height:auto; padding:12px 16px; display:flex; align-items:center; justify-content:space-between;">
+            <div>
+              <div style="font-weight:600;">${formatDate(l.date)}</div>
+              <div style="font-size:12px; color:var(--text-muted);">${l.hours} hours</div>
+            </div>
+            <div class="table-actions">
+              <button class="icon-btn" onclick="editStudyLog('${l.date}', ${l.hours})">✏️</button>
+              <button class="icon-btn del" onclick="deleteStudyLog('${l.date}')">🗑️</button>
+            </div>
+          </div>
+        `).join('')}
+    </div>
+  `;
+  openModal('📚 Edit Study Logs', html);
+}
+
+function editStudyLog(date, hours) {
+  openModal(`✏️ Edit Log: ${formatDate(date)}`, `
+    <div class="form-group"><label class="form-label">Hours Studied *</label><input class="form-input" type="number" min="0" max="24" step="0.5" id="f_editStudyHours" value="${hours}"/></div>
+    <div class="form-actions">
+      <button class="btn btn-outline" onclick="openStudyLogsModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveEditedStudyLog('${date}')">Save</button>
+    </div>
+  `);
+}
+
+function openLogStudyHoursModal() {
+  const d = new Date(); d.setDate(d.getDate() + (STATE.dayOffset||0));
+  const dateStr = d.toISOString().split('T')[0];
+  openModal('📚 Log Study Hours', `
+    <div class="form-group"><label class="form-label">Select Date</label><input class="form-input" type="date" id="f_studyDate" value="${dateStr}" max="${new Date().toISOString().split('T')[0]}"/></div>
+    <div class="form-group"><label class="form-label">Hours Studied *</label><input class="form-input" type="number" min="0" max="24" step="0.5" id="f_studyHoursInput" placeholder="e.g. 4.5"/></div>
+    <div class="form-actions">
+      <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveCustomStudyLog()">Save</button>
+    </div>
+  `);
+}
+
+function saveCustomStudyLog() {
+  const date = document.getElementById('f_studyDate')?.value;
+  const hours = parseFloat(document.getElementById('f_studyHoursInput')?.value) || 0;
+  if (!date || hours <= 0) { showToast('Enter valid date and hours', 'error'); return; }
+  
+  if (!STATE.studyLogs) STATE.studyLogs = [];
+  const existing = STATE.studyLogs.findIndex(l => l.date === date);
+  if (existing >= 0) STATE.studyLogs[existing].hours = hours;
+  else STATE.studyLogs.push({ date, hours });
+  
+  save();
+  closeModal();
+  if (STATE.currentView === 'planner') renderPlanner();
+  if (STATE.currentView === 'stats') renderStats();
+  renderDashboard();
+  showToast('Study hours logged!', 'success');
+}
+
+function saveEditedStudyLog(date) {
+  const hours = parseFloat(document.getElementById('f_editStudyHours')?.value) || 0;
+  const existing = STATE.studyLogs.findIndex(l => l.date === date);
+  if (existing >= 0) STATE.studyLogs[existing].hours = hours;
+  save(); 
+  if (STATE.currentView === 'stats') renderStats();
+  openStudyLogsModal();
+  showToast('Log updated', 'success');
+}
+
+function deleteStudyLog(date) {
+  STATE.studyLogs = STATE.studyLogs.filter(l => l.date !== date);
+  save();
+  if (STATE.currentView === 'stats') renderStats();
+  openStudyLogsModal();
+  showToast('Log deleted', 'info');
+}
+
+function saveStudyLog(date) {
+  const hours = parseFloat(document.getElementById('f_studyHours')?.value) || 0;
+  if (!STATE.studyLogs) STATE.studyLogs = [];
+  const existing = STATE.studyLogs.findIndex(l => l.date === date);
+  if (existing >= 0) STATE.studyLogs[existing] = { date, hours };
+  else STATE.studyLogs.push({ date, hours });
+  save(); closeModal();
+  showToast('Study hours logged!', 'success');
+  if (STATE.currentView === 'stats') renderStats();
+}
+
+function skipStudyPrompt() {
+  closeModal();
+}
+
+// ==================== SEMESTER MENU (CURRENT + PREVIOUS) ====================
+function openSemesterMenu() {
+  const current = STATE.semester;
+  const prev = STATE.semesters || [];
+
+  const prevHtml = prev.length === 0 ? '<div class="empty-state"><span>📚</span><p>No previous semesters archived.</p></div>'
+    : prev.map((s, i) => `
+      <div class="note-card" style="min-height:auto; padding:12px;">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <div><strong>${escHtml(s.name||'Semester')}</strong></div>
+          <div>
+            <button class="icon-btn" onclick="editPreviousSemester(${i})">✏️</button>
+            <button class="icon-btn del" onclick="deletePreviousSemester(${i})">🗑️</button>
+          </div>
+        </div>
+        <div style="font-size:12px; color:var(--text-muted); margin-top:4px;">${formatDate(s.startDate)} → ${formatDate(s.endDate)}</div>
+        ${s.marksInternals ? `<div style="font-size:13px; margin-top:6px;">Internal Marks: <strong>${escHtml(s.marksInternals)}</strong></div>` : ''}
+        ${s.marksSemester ? `<div style="font-size:13px;">Semester Grade: <strong>${escHtml(s.marksSemester)}</strong></div>` : ''}
+        ${(s.completedExams||[]).length ? `<div style="font-size:12px; color:var(--text-muted); margin-top:4px;">📝 ${s.completedExams.length} exams completed</div>` : ''}
+      </div>
+    `).join('');
+
+  openModal('🎓 Semester Manager', `
+    <div class="sub-tabs" style="margin-bottom:16px;">
+      <button class="sub-tab active" onclick="this.parentElement.querySelectorAll('.sub-tab').forEach(b=>b.classList.remove('active')); this.classList.add('active'); document.getElementById('semCurrentPanel').style.display='block'; document.getElementById('semPrevPanel').style.display='none';">Current Semester</button>
+      <button class="sub-tab" onclick="this.parentElement.querySelectorAll('.sub-tab').forEach(b=>b.classList.remove('active')); this.classList.add('active'); document.getElementById('semCurrentPanel').style.display='none'; document.getElementById('semPrevPanel').style.display='block';">Previous Semesters</button>
+    </div>
+    <div id="semCurrentPanel">
+      <div style="background:var(--bg-tertiary); padding:16px; border-radius:10px; margin-bottom:16px;">
+        <div style="font-size:18px; font-weight:700;">${escHtml(current.name||'Semester')}</div>
+        <div style="font-size:13px; color:var(--text-muted); margin-top:4px;">${formatDate(current.startDate)} → ${formatDate(current.endDate)}</div>
+        <div style="margin-top:8px; font-size:13px;">Internal Marks: <strong>${escHtml(current.marksLastInternals||'—')}</strong></div>
+        <div style="font-size:13px;">Semester Grade: <strong>${escHtml(current.marksLastSemester||'—')}</strong></div>
+      </div>
+      <button class="btn btn-outline" style="width:100%;" onclick="openSemesterSettings()">Edit Current Semester</button>
+      <button class="btn btn-primary" style="width:100%; margin-top:8px;" onclick="archiveCurrentSemester()">Archive & Start New Semester</button>
+    </div>
+    <div id="semPrevPanel" style="display:none;">
+      ${prevHtml}
+    </div>
+  `);
+}
+
+function archiveCurrentSemester() {
+  if (!STATE.semesters) STATE.semesters = [];
+  STATE.semesters.push({
+    name: STATE.semester.name,
+    startDate: STATE.semester.startDate,
+    endDate: STATE.semester.endDate,
+    marksInternals: STATE.semester.marksLastInternals,
+    marksSemester: STATE.semester.marksLastSemester,
+    completedExams: [...(STATE.completedExams||[])],
+    courses: STATE.courses.filter(c => c.status === 'completed').map(c => ({name:c.name, code:c.code, grade:c.grade})),
+  });
+  // Reset current semester
+  STATE.semester = { startDate: '', endDate: '', name: 'Semester ' + (STATE.semesters.length + 1), marksLastInternals: '', marksLastSemester: '' };
+  STATE.completedExams = [];
+  save(); 
+  
+  // Show celebration popup
+  openModal('🎉 Congratulations!', `
+    <div style="text-align:center; padding: 20px;">
+      <div style="font-size:64px; animation: bounce 1s infinite alternate;">✨🎓✨</div>
+      <h2 style="color:var(--text-primary); margin:16px 0;">Semester Archived!</h2>
+      <p style="color:var(--text-muted); font-size:15px; margin-bottom:24px;">Congratulations on finishing the semester and best of luck for the next sem!</p>
+      <button class="btn btn-primary" style="width:100%;" onclick="closeModal(); updateSemesterUI(); if (STATE.currentView === 'stats') renderStats();">Start New Semester</button>
+    </div>
+  `);
+}
+
+function editPreviousSemester(index) {
+  const s = STATE.semesters[index];
+  if (!s) return;
+  openModal('✏️ Edit Past Semester', `
+    <div class="form-group">
+      <label class="form-label">Semester Name</label>
+      <input class="form-input" id="f_prevSemName" value="${escHtml(s.name||'')}"/>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Internal Marks</label><input class="form-input" id="f_prevSemInt" value="${escHtml(s.marksInternals||'')}"/></div>
+      <div class="form-group"><label class="form-label">End Sem / Grade</label><input class="form-input" id="f_prevSemEndM" value="${escHtml(s.marksSemester||'')}"/></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Start Date</label><input class="form-input" type="date" id="f_prevSemStart" value="${s.startDate||''}"/></div>
+      <div class="form-group"><label class="form-label">End Date</label><input class="form-input" type="date" id="f_prevSemEnd" value="${s.endDate||''}"/></div>
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-outline" onclick="openSemesterMenu()">Cancel</button>
+      <button class="btn btn-primary" onclick="savePreviousSemester(${index})">Save</button>
+    </div>
+  `);
+}
+
+function savePreviousSemester(index) {
+  STATE.semesters[index].name = document.getElementById('f_prevSemName')?.value?.trim() || 'Semester';
+  STATE.semesters[index].marksInternals = document.getElementById('f_prevSemInt')?.value || '';
+  STATE.semesters[index].marksSemester = document.getElementById('f_prevSemEndM')?.value || '';
+  STATE.semesters[index].startDate = document.getElementById('f_prevSemStart')?.value || '';
+  STATE.semesters[index].endDate = document.getElementById('f_prevSemEnd')?.value || '';
+  save();
+  openSemesterMenu();
+  if (STATE.currentView === 'stats') renderStats();
+}
+
+function deletePreviousSemester(index) {
+  STATE.semesters.splice(index, 1);
+  save(); openSemesterMenu();
+  showToast('Previous semester deleted', 'info');
+}
+
+// ==================== TIMEZONE ====================
+function openTimezoneModal() {
+  const timezones = [
+    {value:'Asia/Kolkata', label:'IST (India, Delhi) - Default'},
+    {value:'America/New_York', label:'EST (New York)'},
+    {value:'America/Chicago', label:'CST (Chicago)'},
+    {value:'America/Denver', label:'MST (Denver)'},
+    {value:'America/Los_Angeles', label:'PST (Los Angeles)'},
+    {value:'Europe/London', label:'GMT (London)'},
+    {value:'Europe/Paris', label:'CET (Paris)'},
+    {value:'Europe/Berlin', label:'CET (Berlin)'},
+    {value:'Asia/Dubai', label:'GST (Dubai)'},
+    {value:'Asia/Singapore', label:'SGT (Singapore)'},
+    {value:'Asia/Tokyo', label:'JST (Tokyo)'},
+    {value:'Australia/Sydney', label:'AEST (Sydney)'},
+    {value:'Pacific/Auckland', label:'NZST (Auckland)'},
+    {value:'custom', label:'Custom...'}
+  ];
+  const isCustom = !timezones.find(tz => tz.value === STATE.timezone) && STATE.timezone;
+  const opts = timezones.map(tz => `<option value="${tz.value}" ${(STATE.timezone===tz.value || (tz.value==='custom' && isCustom))?'selected':''}>${tz.label}</option>`).join('');
+  openModal('🌐 Timezone Settings', `
+    <div class="form-group">
+      <label class="form-label">Your Timezone</label>
+      <select class="form-select" id="f_timezone" onchange="document.getElementById('customTzGroup').style.display = this.value === 'custom' ? 'block' : 'none'">
+        ${opts}
+      </select>
+    </div>
+    <div class="form-group" id="customTzGroup" style="display:${isCustom ? 'block' : 'none'}; margin-top:8px;">
+      <label class="form-label">Custom Timezone (e.g., UTC)</label>
+      <input type="text" class="form-input" id="f_customTimezone" placeholder="Enter timezone" value="${isCustom ? STATE.timezone : ''}" />
+    </div>
+    <div class="form-actions"><button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="saveTimezone()">Save</button></div>
+  `);
+}
+
+function saveTimezone() {
+  const sel = document.getElementById('f_timezone')?.value;
+  STATE.timezone = sel === 'custom' ? (document.getElementById('f_customTimezone')?.value.trim() || 'Asia/Kolkata') : sel;
+  save(); closeModal();
+  showToast('Timezone updated! All dates will reflect this.', 'success');
+}
+
+// ==================== CURRENCY ====================
+function openCurrencyModal() {
+  const currencies = [
+    {symbol:'₹', code:'INR', label:'Indian Rupee (₹) - Default'},
+    {symbol:'$', code:'USD', label:'US Dollar ($)'},
+    {symbol:'€', code:'EUR', label:'Euro (€)'},
+    {symbol:'£', code:'GBP', label:'British Pound (£)'},
+    {symbol:'¥', code:'JPY', label:'Japanese Yen (¥)'},
+    {symbol:'A$', code:'AUD', label:'Australian Dollar (A$)'},
+    {symbol:'C$', code:'CAD', label:'Canadian Dollar (C$)'},
+    {symbol:'CHF', code:'CHF', label:'Swiss Franc (CHF)'},
+    {symbol:'₹', code:'NPR', label:'Nepalese Rupee (₹)'},
+    {symbol:'฿', code:'THB', label:'Thai Baht (฿)'},
+    {symbol:'custom', code:'custom', label:'Custom...'}
+  ];
+  const isCustom = !currencies.find(c => c.code === STATE.currency?.code) && STATE.currency?.code;
+  const opts = currencies.map(c => `<option value="${c.code}" data-symbol="${c.symbol}" ${(STATE.currency?.code===c.code || (c.code==='custom' && isCustom))?'selected':''}>${c.label}</option>`).join('');
+  
+  openModal('💱 Currency Settings', `
+    <div class="form-group">
+      <label class="form-label">Budget Currency</label>
+      <select class="form-select" id="f_currency" onchange="document.getElementById('customCurGroup').style.display = this.value === 'custom' ? 'block' : 'none'">
+        ${opts}
+      </select>
+    </div>
+    <div id="customCurGroup" style="display:${isCustom ? 'block' : 'none'}; margin-top:8px;">
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Symbol</label><input type="text" class="form-input" id="f_customSymbol" placeholder="e.g. R" value="${isCustom ? STATE.currency?.symbol : ''}" /></div>
+        <div class="form-group"><label class="form-label">Code</label><input type="text" class="form-input" id="f_customCode" placeholder="e.g. ZAR" value="${isCustom ? STATE.currency?.code : ''}" /></div>
+      </div>
+    </div>
+    <div class="form-actions"><button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="saveCurrency()">Save</button></div>
+  `);
+}
+
+function saveCurrency() {
+  const sel = document.getElementById('f_currency');
+  if (sel?.value === 'custom') {
+    STATE.currency = { 
+      symbol: document.getElementById('f_customSymbol')?.value.trim() || '$', 
+      code: document.getElementById('f_customCode')?.value.trim() || 'USD' 
+    };
+  } else {
+    const opt = sel?.selectedOptions?.[0];
+    STATE.currency = { symbol: opt?.dataset?.symbol || '₹', code: sel?.value || 'INR' };
+  }
+  save(); closeModal(); renderBudget(); renderDashboard();
+  showToast('Currency updated!', 'success');
+}
+
+// ==================== COURSE SEMESTER FIELD ====================
+// (Handled inline in buildCourseForm — see updates there)
+
+// ==================== MIDNIGHT DAY CHANGE DETECTION ====================
+let _lastKnownDay = '';
+function checkMidnightReset() {
+  const td = today();
+  if (_lastKnownDay && _lastKnownDay !== td) {
+    // Day changed! Refresh everything
+    checkTodoReset();
+    checkDailyStudyPrompt();
+    renderAll();
+    showToast('🌅 New day! All daily data refreshed.', 'info');
+  }
+  _lastKnownDay = td;
 }
 
 document.addEventListener('DOMContentLoaded', () => {

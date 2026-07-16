@@ -60,6 +60,9 @@
       <a href="#" class="nav-item" data-view="workout">
         <span class="nav-icon">💪</span> Workout
       </a>
+      <a href="#" class="nav-item" data-view="stats">
+        <span class="nav-icon">📊</span> Stats
+      </a>
       <a href="#" class="nav-item" data-view="budget">
         <span class="nav-icon">💰</span> Budget
       </a>
@@ -103,7 +106,10 @@
       <div class="topbar-breadcrumb" id="topbarBreadcrumb">🏠 Dashboard</div>
       <div class="topbar-actions">
         <span class="current-date" id="currentDate"></span>
-        <span class="live-clock" id="liveClock" title="IST (Delhi)"></span>
+        <div class="topbar-right" style="display:flex; align-items:center; gap:4px;">
+          <span class="live-clock" id="liveClock" title="Click to change timezone" onclick="openTimezoneModal()" style="cursor:pointer;"></span>
+          <button class="icon-btn" onclick="openProfileModal()" title="Settings">⚙️</button>
+        </div>
         <div class="user-badge" id="userBadge" style="display:flex;" title="Profile Menu">
           <img src="https://ui-avatars.com/api/?name=G&background=ff9800&color=fff" id="userAvatar" alt="User" />
           <span id="userName">Guest</span>
@@ -300,11 +306,10 @@
       </div>
 
       <div class="subtab-panel active" id="subtab-planner-weekly">
-        <div class="week-nav">
-          <button class="btn btn-outline" id="prevDay">← Prev</button>
-          <span class="week-label" id="dayLabel"></span>
-          <button class="btn btn-outline" id="nextDay">Next →</button>
-          <button class="btn btn-primary" id="addSessionBtn">+ Add Task</button>
+        <div class="header-actions" style="display:flex; justify-content:space-between; align-items:center;">
+          <button class="btn btn-outline" id="prevDay">◀ Prev Day</button>
+          <button class="btn btn-primary" onclick="openLogStudyHoursModal()">📚 Log Study Hours</button>
+          <button class="btn btn-outline" id="nextDay">Next Day ▶</button>
         </div>
         <div class="daily-grid-wrap">
           <div class="daily-grid" id="dailyGrid"></div>
@@ -314,7 +319,10 @@
       <div class="subtab-panel" id="subtab-planner-todo">
         <div class="card">
           <div class="card-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
-            <h2>📝 To-Do List</h2>
+            <div style="display:flex; align-items:center; gap:12px;">
+              <h2>📝 To-Do List</h2>
+              <button class="btn btn-outline btn-sm" id="randomizeTopicBtn" style="color:var(--accent); border-color:var(--accent);">🎲 Random Topic</button>
+            </div>
             <div class="todo-notification-settings" style="display:flex; align-items:center; gap:8px; font-size:14px; color:var(--text-secondary);">
               <label>Reminder:</label>
               <input type="number" id="todoIntervalHours" class="form-input" min="0" max="999" placeholder="Hrs" style="width: 70px; display: inline-block; padding: 6px;" />
@@ -365,7 +373,7 @@
         <button class="sub-tab active" data-subtab="today">📅 Daily</button>
         <button class="sub-tab" data-subtab="plan">📋 Workout Plan</button>
         <button class="sub-tab" data-subtab="machines">🏋️ Machines</button>
-        <button class="sub-tab" data-subtab="badminton">🏸 Badminton</button>
+        <button class="sub-tab" data-subtab="activities">🏸 Activities</button>
         <button class="sub-tab" data-subtab="history">🗂️ History</button>
       </div>
 
@@ -377,6 +385,16 @@
           <button class="btn btn-outline" id="nextWorkoutDay">Next →</button>
           <button class="btn btn-primary" id="todayWorkoutBtn" style="margin-left: 12px;">Today</button>
         </div>
+
+        <!-- Activity Checklist (Badminton + Custom always visible) -->
+        <div class="card" style="margin-bottom:20px;">
+          <div class="card-header">
+            <h2>🏃 Activities</h2>
+            <button class="btn btn-sm btn-outline" onclick="navigate('workout'); setWorkoutSubTab('activities');">Manage →</button>
+          </div>
+          <div id="todayActivityChecklist" class="exercise-list"></div>
+        </div>
+
         <div class="two-col" style="margin-bottom:20px;">
           <div class="card">
             <div class="card-header">
@@ -385,15 +403,6 @@
             </div>
             <div id="todayGymLog">
               <div class="empty-state"><span>🏋️</span><p>No gym session logged today.</p></div>
-            </div>
-          </div>
-          <div class="card">
-            <div class="card-header">
-              <h2>🏸 Badminton</h2>
-              <button class="btn btn-sm btn-primary" id="logBadmintonBtn">+ Log Badminton</button>
-            </div>
-            <div id="todayBadmintonLog">
-              <div class="empty-state"><span>🏸</span><p>No badminton session logged today.</p></div>
             </div>
           </div>
         </div>
@@ -446,18 +455,26 @@
         </div>
       </div>
 
-      <!-- BADMINTON SUB-TAB -->
-      <div class="subtab-panel" id="subtab-badminton">
+      <!-- ACTIVITIES SUB-TAB -->
+      <div class="subtab-panel" id="subtab-activities">
         <div class="filter-bar">
-          <div></div>
-          <button class="btn btn-primary" id="addBadmintonBtn">+ Log Session</button>
+          <div class="filter-group" id="activityFilterGroup">
+            <button class="filter-btn active" data-activity-filter="all">All</button>
+            <button class="filter-btn" data-activity-filter="badminton">🏸 Badminton</button>
+            <button class="filter-btn" data-activity-filter="custom">🏃 Custom</button>
+          </div>
+          <div style="display:flex;gap:8px;">
+            <button class="btn btn-outline" id="addCustomActivityBtn">+ Add Sport</button>
+            <button class="btn btn-primary" id="addBadmintonBtn">+ Log Session</button>
+          </div>
         </div>
         <div class="badminton-stats" id="badmintonStats"></div>
+        <div id="customActivitiesList" style="margin:16px 0;"></div>
         <div class="table-wrapper" style="margin-top:16px;">
           <table class="data-table">
-            <thead><tr><th>Date</th><th>Duration (min)</th><th>Partner</th><th>Sets Won/Lost</th><th>Notes</th><th>Actions</th></tr></thead>
+            <thead><tr><th>Date</th><th>Activity</th><th>Duration (min)</th><th>Calories</th><th>Actions</th></tr></thead>
             <tbody id="badmintonTbody">
-              <tr class="empty-row"><td colspan="6"><div class="empty-state"><span>🏸</span><p>No badminton sessions logged yet.</p></div></td></tr>
+              <tr class="empty-row"><td colspan="5"><div class="empty-state"><span>🏸</span><p>No activity sessions logged yet.</p></div></td></tr>
             </tbody>
           </table>
         </div>
@@ -486,7 +503,10 @@
           <h1 style="display:flex; align-items:center; gap:12px;">💰 Budget Tracker <span id="budgetMonthLabel" style="font-size:14px; font-weight:600; background:var(--bg-tertiary); padding:4px 10px; border-radius:12px; color:var(--text-secondary);"></span></h1>
           <p class="page-sub">Keep your finances in check as a student.</p>
         </div>
-        <button class="btn btn-outline" id="viewPastMonthsBtn">📅 View Past Months</button>
+        <div style="display:flex; gap:8px;">
+          <button class="btn btn-outline" onclick="openCurrencyModal()">💱 Currency</button>
+          <button class="btn btn-outline" id="viewPastMonthsBtn">📅 Past Months</button>
+        </div>
       </div>
       <div class="budget-overview">
         <div class="budget-stat-card">
@@ -574,6 +594,77 @@
         </div>
         <div class="photos-grid" id="photosGrid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px; margin-top: 16px;">
           <div class="empty-state full-empty" style="grid-column: 1 / -1;"><span>📸</span><p>No photos yet. Upload your first photo!</p></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- STATS VIEW -->
+    <section class="view" id="view-stats">
+      <div class="page-header">
+        <h1>📊 Stats & Progress</h1>
+        <p class="page-sub">Track your study progress, workout consistency, and semester comparisons.</p>
+      </div>
+
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px; margin-bottom:16px;">
+        <div class="sub-tabs" id="statsSubTabs" style="margin:0;">
+          <button class="sub-tab active" data-subtab="stats-study">📚 Study</button>
+          <button class="sub-tab" data-subtab="stats-assignments">📝 Assignments</button>
+          <button class="sub-tab" data-subtab="stats-workout">💪 Workout</button>
+          <button class="sub-tab" data-subtab="stats-semester">🎓 Semester</button>
+        </div>
+        <div style="display:flex; gap:12px; background:var(--bg-secondary); padding:4px; border-radius:12px;">
+          <select id="statsTimeRange" class="form-select" style="min-width:120px; border:none; background:transparent; font-size:13px; font-weight:600;" onchange="updateStatsConfig('range', this.value)">
+            <option value="all">All Time</option>
+            <option value="year">This Year</option>
+            <option value="month">This Month</option>
+            <option value="week">This Week</option>
+            <option value="today">Today</option>
+          </select>
+          <div style="width:1px; background:var(--border); margin:4px 0;"></div>
+          <select id="statsGraphType" class="form-select" style="min-width:120px; border:none; background:transparent; font-size:13px; font-weight:600;" onchange="updateStatsConfig('type', this.value)">
+            <option value="bar">📊 Bar Chart</option>
+            <option value="line">📈 Line Chart</option>
+            <option value="pie">🥧 Pie Chart</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="subtab-panel active" id="subtab-stats-study">
+        <div class="stats-overview-cards" id="studyStatsCards"></div>
+        <div class="card" style="margin-top:20px;">
+          <div class="card-header" style="display:flex; justify-content:space-between; align-items:center;">
+            <h2>📈 Daily Study Hours</h2>
+            <button class="btn btn-sm btn-outline" onclick="openStudyLogsModal()">✏️ Edit Logs</button>
+          </div>
+          <div style="padding:16px; overflow-x:auto;"><canvas id="studyHoursChart" height="250"></canvas></div>
+        </div>
+        <div class="card" style="margin-top:20px;">
+          <div class="card-header"><h2>✅ To-Dos Completed Daily</h2></div>
+          <div style="padding:16px; overflow-x:auto;"><canvas id="todoStatsChart" height="250"></canvas></div>
+        </div>
+      </div>
+
+      <div class="subtab-panel" id="subtab-stats-assignments">
+        <div class="stats-overview-cards" id="assignmentStatsCards"></div>
+        <div class="card" style="margin-top:20px;">
+          <div class="card-header"><h2>📊 Assignment Completion Over Time</h2></div>
+          <div style="padding:16px; overflow-x:auto;"><canvas id="assignmentChart" height="250"></canvas></div>
+        </div>
+      </div>
+
+      <div class="subtab-panel" id="subtab-stats-workout">
+        <div class="stats-overview-cards" id="workoutStatsCards"></div>
+        <div class="card" style="margin-top:20px;">
+          <div class="card-header"><h2>🏋️ Workout Activity (Last 30 Days)</h2></div>
+          <div style="padding:16px; overflow-x:auto;"><canvas id="workoutChart" height="250"></canvas></div>
+        </div>
+      </div>
+
+      <div class="subtab-panel" id="subtab-stats-semester">
+        <div class="stats-overview-cards" id="semesterStatsCards"></div>
+        <div class="card" style="margin-top:20px;">
+          <div class="card-header"><h2>🎓 Semester Comparison</h2></div>
+          <div style="padding:16px; overflow-x:auto;"><canvas id="semesterCompareChart" height="250"></canvas></div>
         </div>
       </div>
     </section>
