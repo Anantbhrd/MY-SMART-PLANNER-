@@ -23,6 +23,7 @@ const STATE = {
   },
   semester: { startDate: '', endDate: '', name: 'Semester 1', marksLastInternals: '', marksLastSemester: '' },
   semesters: [], // archived semesters: [{name, startDate, endDate, courses:[], completedExams:[], marksInternals, marksSemester}]
+  futureSemesters: [], // planned future semesters
   workout: {
     machines: [],
     plans: [],
@@ -848,40 +849,49 @@ function renderCourses() {
   const activeGrid = document.getElementById('activeCoursesGrid');
   const completedGrid = document.getElementById('completedCoursesGrid');
   const upcomingGrid = document.getElementById('upcomingCoursesGrid');
+  const gateGrid = document.getElementById('gateCoursesGrid');
   const activeHeader = document.getElementById('activeCourseHeader');
   const completedHeader = document.getElementById('completedCourseHeader');
   const upcomingHeader = document.getElementById('upcomingCourseHeader');
-  if (!activeGrid || !completedGrid || !upcomingGrid) return;
+  const gateHeader = document.getElementById('gateCourseHeader');
+  if (!activeGrid || !completedGrid || !upcomingGrid || !gateGrid) return;
   
-  activeGrid.innerHTML = ''; completedGrid.innerHTML = ''; upcomingGrid.innerHTML = '';
+  activeGrid.innerHTML = ''; completedGrid.innerHTML = ''; upcomingGrid.innerHTML = ''; gateGrid.innerHTML = '';
   
   let activeCourses = STATE.courses.filter(c => c.status !== 'completed' && c.status !== 'upcoming');
   let completedCourses = STATE.courses.filter(c => c.status === 'completed');
   let upcomingCourses = STATE.courses.filter(c => c.status === 'upcoming');
+  let gateCourses = STATE.courses.filter(c => c.category === 'gate');
 
   // Sort courses by code (indexing)
   activeCourses.sort((a,b) => (a.code||'').localeCompare(b.code||''));
   completedCourses.sort((a,b) => (a.code||'').localeCompare(b.code||''));
   upcomingCourses.sort((a,b) => (a.code||'').localeCompare(b.code||''));
+  gateCourses.sort((a,b) => (a.code||'').localeCompare(b.code||''));
 
-  if (courseFilter === 'active') { completedCourses = []; upcomingCourses = []; }
-  if (courseFilter === 'completed') { activeCourses = []; upcomingCourses = []; }
-  if (courseFilter === 'upcoming') { activeCourses = []; completedCourses = []; }
+  if (courseFilter === 'gate') { activeCourses = []; upcomingCourses = []; completedCourses = []; }
+  else if (courseFilter === 'active') { completedCourses = []; upcomingCourses = []; gateCourses = []; }
+  else if (courseFilter === 'completed') { activeCourses = []; upcomingCourses = []; gateCourses = []; }
+  else if (courseFilter === 'upcoming') { activeCourses = []; completedCourses = []; gateCourses = []; }
 
   activeHeader.style.display = activeCourses.length || courseFilter === 'all' || courseFilter === 'active' ? 'flex' : 'none';
   completedHeader.style.display = completedCourses.length || courseFilter === 'all' || courseFilter === 'completed' ? 'flex' : 'none';
   upcomingHeader.style.display = upcomingCourses.length || courseFilter === 'all' || courseFilter === 'upcoming' ? 'flex' : 'none';
+  gateHeader.style.display = gateCourses.length || courseFilter === 'gate' ? 'flex' : 'none';
   
   activeGrid.style.display = activeHeader.style.display === 'none' ? 'none' : 'grid';
   completedGrid.style.display = completedHeader.style.display === 'none' ? 'none' : 'grid';
   upcomingGrid.style.display = upcomingHeader.style.display === 'none' ? 'none' : 'grid';
+  gateGrid.style.display = gateHeader.style.display === 'none' ? 'none' : 'grid';
 
   function renderList(list, gridEl, emptyMsg) {
     if (!list.length) { gridEl.innerHTML=`<div class="empty-state full-empty"><span>📭</span><p>${emptyMsg}</p></div>`; return; }
     gridEl.innerHTML = list.map(c => {
       const ta = STATE.assignments.filter(a => a.course === c.name).length;
       const da = STATE.assignments.filter(a => a.course === c.name && a.status === 'done').length;
-      return `<div class="course-card" style="border-top:3px solid ${c.color}; cursor:pointer;" onclick="openSyllabus('${c.id}')">
+      const checkboxHtml = window.isBulkEditMode ? `<input type="checkbox" class="course-checkbox" value="${c.id}" style="position:absolute; top:12px; right:12px; width:18px; height:18px; z-index:10; cursor:pointer;" onclick="event.stopPropagation(); updateBulkSelectedCount()" />` : '';
+      return `<div class="course-card" style="border-top:3px solid ${c.color}; cursor:pointer; position:relative;" onclick="openSyllabus('${c.id}')">
+        ${checkboxHtml}
         <div class="course-code">${escHtml(c.code||'')}</div>
         <div class="course-name">${escHtml(c.name)}</div>
         <div class="course-prof">${escHtml(c.prof||'')}</div>
@@ -903,6 +913,7 @@ function renderCourses() {
   renderList(activeCourses, activeGrid, 'No active courses.');
   renderList(completedCourses, completedGrid, 'No completed courses.');
   renderList(upcomingCourses, upcomingGrid, 'No upcoming courses.');
+  renderList(gateCourses, gateGrid, 'No GATE courses.');
 }
 function deleteCourse(id) { STATE.courses=STATE.courses.filter(c=>c.id!==id); save(); renderCourses(); showToast('Deleted','info'); }
 function toggleCourseStatus(id) {
@@ -945,6 +956,62 @@ function toggleCourseStatus(id) {
     `);
   }
 }
+
+window.isBulkEditMode = false;
+function toggleBulkEditMode() {
+  window.isBulkEditMode = !window.isBulkEditMode;
+  const bar = document.getElementById('bulkActionsBar');
+  const btn = document.getElementById('bulkEditToggleBtn');
+  if (bar) bar.style.display = window.isBulkEditMode ? 'flex' : 'none';
+  if (btn) {
+    btn.textContent = window.isBulkEditMode ? 'Cancel Bulk Edit' : 'Bulk Edit';
+    btn.classList.toggle('btn-primary', window.isBulkEditMode);
+    btn.classList.toggle('btn-outline', !window.isBulkEditMode);
+  }
+  
+  // Populate semester dropdown
+  if (window.isBulkEditMode) {
+    const sel = document.getElementById('bulkSemesterSelect');
+    if (sel) {
+      const semesters = [{name: STATE.semester.name||'Current Semester'}, ...(STATE.semesters||[]), ...(STATE.futureSemesters||[])];
+      sel.innerHTML = '<option value="">-- Select Semester --</option>' + semesters.map(s => `<option value="${escHtml(s.name)}">${escHtml(s.name)}</option>`).join('');
+    }
+  }
+  
+  renderCourses();
+  updateBulkSelectedCount();
+}
+
+window.updateBulkSelectedCount = function() {
+  const checkboxes = document.querySelectorAll('.course-checkbox:checked');
+  const countSpan = document.getElementById('bulkSelectedCount');
+  if (countSpan) countSpan.textContent = checkboxes.length;
+}
+
+window.applyBulkSemesterAssignment = function() {
+  const sel = document.getElementById('bulkSemesterSelect');
+  const targetSem = sel ? sel.value : '';
+  if (!targetSem) { showToast('Please select a semester', 'warning'); return; }
+  
+  const checkboxes = document.querySelectorAll('.course-checkbox:checked');
+  if (checkboxes.length === 0) { showToast('No courses selected', 'warning'); return; }
+  
+  let count = 0;
+  checkboxes.forEach(cb => {
+    const c = STATE.courses.find(x => x.id === cb.value);
+    if (c) {
+      c.semester = targetSem;
+      count++;
+    }
+  });
+  
+  if (count > 0) {
+    save();
+    toggleBulkEditMode(); // turn it off after apply
+    showToast(`Assigned ${count} course(s) to ${targetSem}`, 'success');
+  }
+}
+
 function completeCourse(id) {
   const c = STATE.courses.find(x => x.id === id);
   if (!c) return;
@@ -959,7 +1026,7 @@ function completeCourse(id) {
 function editCourse(id) { const c=STATE.courses.find(x=>x.id===id); openModal('Edit Course', buildCourseForm(c)); }
 function buildCourseForm(c={}) {
   const attHtml = c.attachment ? `<div style="margin-top:8px;"><a href="${escHtml(c.attachment)}" target="_blank" style="font-size:12px; color:var(--accent);">🔗 View current attachment</a></div>` : '';
-  const semesters = [{name: STATE.semester.name||'Current Semester'}, ...(STATE.semesters||[])];
+  const semesters = [{name: STATE.semester.name||'Current Semester'}, ...(STATE.semesters||[]), ...(STATE.futureSemesters||[])];
   const semOpts = semesters.map(s => `<option value="${escHtml(s.name)}" ${c.semester===s.name?'selected':''}>${escHtml(s.name)}</option>`).join('');
   return `
     <div class="form-group"><label class="form-label">Course Code</label><input type="text" id="f_courseCode" class="form-input" value="${escHtml(c.code||'')}" placeholder="e.g. CS101"/></div>
@@ -982,6 +1049,12 @@ function buildCourseForm(c={}) {
       <input type="file" id="f_courseFile" accept=".pdf,.ppt,.pptx" class="form-input" style="padding: 6px;" />
       ${attHtml}
     </div>
+    <div class="form-group">
+      <label class="form-label" style="display:flex; align-items:center; gap:8px;">
+        <input type="checkbox" id="f_courseGate" style="width:16px; height:16px;" ${c.category === 'gate' ? 'checked' : ''} />
+        This is a GATE Course
+      </label>
+    </div>
     <div class="form-actions"><button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-primary" id="saveCourseBtn" onclick="handleSaveCourse('${c.id||''}')">Save Course</button></div>`;
 }
 async function handleSaveCourse(id) {
@@ -998,8 +1071,9 @@ async function handleSaveCourse(id) {
     const color=document.getElementById('f_courseColor')?.value||'#3b82f6';
     const status=document.getElementById('f_courseStatus')?.value||'active';
     const semester=document.getElementById('f_courseSemester')?.value||'';
-    if (!id) STATE.courses.push({ id: genId(), code, name, prof, color, status, semester, attachment });
-    else { const c=STATE.courses.find(x=>x.id===id); if(c) { c.code=code; c.name=name; c.prof=prof; c.color=color; c.status=status; c.semester=semester; if(attachment) c.attachment=attachment; } }
+    const category=document.getElementById('f_courseGate')?.checked ? 'gate' : '';
+    if (!id) STATE.courses.push({ id: genId(), code, name, prof, color, status, semester, category, attachment });
+    else { const c=STATE.courses.find(x=>x.id===id); if(c) { c.code=code; c.name=name; c.prof=prof; c.color=color; c.status=status; c.semester=semester; c.category=category; if(attachment) c.attachment=attachment; } }
     save(); renderCourses(); closeModal(); showToast('Course saved','success');
   } catch(e) {
     showToast('Failed: ' + e.message, 'error');
@@ -3725,6 +3799,8 @@ function openSemesterMenu() {
   const current = STATE.semester;
   const prev = STATE.semesters || [];
 
+  const future = STATE.futureSemesters || [];
+
   const prevHtml = prev.length === 0 ? '<div class="empty-state"><span>📚</span><p>No previous semesters archived.</p></div>'
     : prev.map((s, i) => `
       <div class="note-card" style="min-height:auto; padding:12px;">
@@ -3742,10 +3818,25 @@ function openSemesterMenu() {
       </div>
     `).join('');
 
+  const futureHtml = future.length === 0 ? '<div class="empty-state"><span>🔮</span><p>No future semesters planned.</p></div>'
+    : future.map((s, i) => `
+      <div class="note-card" style="min-height:auto; padding:12px;">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <div><strong>${escHtml(s.name||'Semester')}</strong></div>
+          <div>
+            <button class="icon-btn" onclick="editFutureSemester(${i})">✏️</button>
+            <button class="icon-btn del" onclick="deleteFutureSemester(${i})">🗑️</button>
+          </div>
+        </div>
+        <div style="font-size:12px; color:var(--text-muted); margin-top:4px;">${formatDate(s.startDate)} → ${formatDate(s.endDate)}</div>
+      </div>
+    `).join('');
+
   openModal('🎓 Semester Manager', `
     <div class="sub-tabs" style="margin-bottom:16px;">
-      <button class="sub-tab active" onclick="this.parentElement.querySelectorAll('.sub-tab').forEach(b=>b.classList.remove('active')); this.classList.add('active'); document.getElementById('semCurrentPanel').style.display='block'; document.getElementById('semPrevPanel').style.display='none';">Current Semester</button>
-      <button class="sub-tab" onclick="this.parentElement.querySelectorAll('.sub-tab').forEach(b=>b.classList.remove('active')); this.classList.add('active'); document.getElementById('semCurrentPanel').style.display='none'; document.getElementById('semPrevPanel').style.display='block';">Previous Semesters</button>
+      <button class="sub-tab active" onclick="this.parentElement.querySelectorAll('.sub-tab').forEach(b=>b.classList.remove('active')); this.classList.add('active'); document.getElementById('semCurrentPanel').style.display='block'; document.getElementById('semPrevPanel').style.display='none'; document.getElementById('semFuturePanel').style.display='none';">Current</button>
+      <button class="sub-tab" onclick="this.parentElement.querySelectorAll('.sub-tab').forEach(b=>b.classList.remove('active')); this.classList.add('active'); document.getElementById('semCurrentPanel').style.display='none'; document.getElementById('semPrevPanel').style.display='block'; document.getElementById('semFuturePanel').style.display='none';">Previous</button>
+      <button class="sub-tab" onclick="this.parentElement.querySelectorAll('.sub-tab').forEach(b=>b.classList.remove('active')); this.classList.add('active'); document.getElementById('semCurrentPanel').style.display='none'; document.getElementById('semPrevPanel').style.display='none'; document.getElementById('semFuturePanel').style.display='block';">Future</button>
     </div>
     <div id="semCurrentPanel">
       <div style="background:var(--bg-tertiary); padding:16px; border-radius:10px; margin-bottom:16px;">
@@ -3759,6 +3850,10 @@ function openSemesterMenu() {
     </div>
     <div id="semPrevPanel" style="display:none;">
       ${prevHtml}
+    </div>
+    <div id="semFuturePanel" style="display:none;">
+      ${futureHtml}
+      <button class="btn btn-primary" style="width:100%; margin-top:8px;" onclick="addFutureSemester()">+ Add Future Semester</button>
     </div>
   `);
 }
@@ -3828,6 +3923,68 @@ function deletePreviousSemester(index) {
   STATE.semesters.splice(index, 1);
   save(); openSemesterMenu();
   showToast('Previous semester deleted', 'info');
+}
+
+function addFutureSemester() {
+  openModal('🔮 Add Future Semester', `
+    <div class="form-group">
+      <label class="form-label">Semester Name</label>
+      <input class="form-input" id="f_futureSemName" value="" placeholder="e.g. Fall 2026"/>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Start Date</label><input class="form-input" type="date" id="f_futureSemStart" /></div>
+      <div class="form-group"><label class="form-label">End Date</label><input class="form-input" type="date" id="f_futureSemEnd" /></div>
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-outline" onclick="openSemesterMenu()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveFutureSemester(-1)">Add Semester</button>
+    </div>
+  `);
+}
+
+function editFutureSemester(index) {
+  const s = STATE.futureSemesters[index];
+  if (!s) return;
+  openModal('✏️ Edit Future Semester', `
+    <div class="form-group">
+      <label class="form-label">Semester Name</label>
+      <input class="form-input" id="f_futureSemName" value="${escHtml(s.name||'')}"/>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Start Date</label><input class="form-input" type="date" id="f_futureSemStart" value="${s.startDate||''}"/></div>
+      <div class="form-group"><label class="form-label">End Date</label><input class="form-input" type="date" id="f_futureSemEnd" value="${s.endDate||''}"/></div>
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-outline" onclick="openSemesterMenu()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveFutureSemester(${index})">Save</button>
+    </div>
+  `);
+}
+
+function saveFutureSemester(index) {
+  if (!STATE.futureSemesters) STATE.futureSemesters = [];
+  const name = document.getElementById('f_futureSemName')?.value?.trim() || 'Future Semester';
+  const startDate = document.getElementById('f_futureSemStart')?.value || '';
+  const endDate = document.getElementById('f_futureSemEnd')?.value || '';
+  
+  if (index === -1) {
+    STATE.futureSemesters.push({ name, startDate, endDate });
+    showToast('Future semester added', 'success');
+  } else {
+    STATE.futureSemesters[index].name = name;
+    STATE.futureSemesters[index].startDate = startDate;
+    STATE.futureSemesters[index].endDate = endDate;
+    showToast('Future semester updated', 'success');
+  }
+  
+  save();
+  openSemesterMenu();
+}
+
+function deleteFutureSemester(index) {
+  STATE.futureSemesters.splice(index, 1);
+  save(); openSemesterMenu();
+  showToast('Future semester deleted', 'info');
 }
 
 // ==================== TIMEZONE ====================

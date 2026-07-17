@@ -267,8 +267,21 @@
           <button class="filter-btn active" data-course-filter="active">Active Courses</button>
           <button class="filter-btn" data-course-filter="upcoming">Upcoming Courses</button>
           <button class="filter-btn" data-course-filter="completed">Completed Courses</button>
+          <button class="filter-btn" data-course-filter="gate">GATE Courses</button>
         </div>
-        <button class="btn btn-primary" id="addCourseBtn">+ Add Course</button>
+        <div style="display:flex; gap:8px;">
+          <button class="btn btn-outline" id="bulkEditToggleBtn" onclick="toggleBulkEditMode()">Bulk Edit</button>
+          <button class="btn btn-primary" id="addCourseBtn">+ Add Course</button>
+        </div>
+      </div>
+      
+      <!-- Bulk Actions Bar -->
+      <div id="bulkActionsBar" style="display:none; background:var(--bg-tertiary); padding:12px; border-radius:8px; margin-bottom:16px; align-items:center; justify-content:space-between;">
+        <div style="font-size:14px; font-weight:600;"><span id="bulkSelectedCount">0</span> Courses Selected</div>
+        <div style="display:flex; gap:8px;">
+          <select id="bulkSemesterSelect" class="form-select" style="min-width:150px;"></select>
+          <button class="btn btn-primary btn-sm" onclick="applyBulkSemesterAssignment()">Assign to Semester</button>
+        </div>
       </div>
       
       <h3 id="activeCourseHeader" style="margin-top: 10px; margin-bottom: 10px; color: var(--accent); display: flex; align-items: center; gap: 8px;">
@@ -288,8 +301,15 @@
       <h3 id="upcomingCourseHeader" style="margin-top: 10px; margin-bottom: 10px; color: var(--warning); display: flex; align-items: center; gap: 8px;">
         ⏳ Upcoming Courses
       </h3>
-      <div class="courses-grid" id="upcomingCoursesGrid">
+      <div class="courses-grid" id="upcomingCoursesGrid" style="margin-bottom: 30px;">
         <div class="empty-state full-empty"><span>📭</span><p>No upcoming courses.</p></div>
+      </div>
+
+      <h3 id="gateCourseHeader" style="margin-top: 10px; margin-bottom: 10px; color: var(--purple); display: flex; align-items: center; gap: 8px;">
+        🎓 GATE Courses
+      </h3>
+      <div class="courses-grid" id="gateCoursesGrid">
+        <div class="empty-state full-empty"><span>📭</span><p>No GATE courses.</p></div>
       </div>
     </section>
 
