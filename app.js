@@ -2811,6 +2811,9 @@ function initAuth() {
       document.getElementById('userAvatar').src = user.photoURL || '';
       document.getElementById('userName').textContent = user.displayName?.split(' ')[0] || 'User';
       
+      // Render local data immediately so the dashboard doesn't look stuck while downloading the large document.
+      renderAll();
+
       if (unsubscribeSnapshot) unsubscribeSnapshot();
       unsubscribeSnapshot = db.collection('users').doc(user.uid).onSnapshot(doc => {
         console.log(auth.currentUser);
