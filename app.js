@@ -82,6 +82,25 @@ const provider = new firebase.auth.GoogleAuthProvider();
 
 async function uploadFile(file) {
   return new Promise((resolve, reject) => {
+    const uploadToStorage = async (dataUrl, fileObj) => {
+      if (currentUser) {
+        try {
+          const res = await fetch(dataUrl);
+          const blob = await res.blob();
+          const cleanName = fileObj.name ? fileObj.name.replace(/[^a-zA-Z0-9.\-]/g, '') : 'image.jpg';
+          const storageRef = storage.ref(`users/${currentUser.uid}/uploads/${Date.now()}_${cleanName}`);
+          const snapshot = await storageRef.put(blob);
+          const downloadURL = await snapshot.ref.getDownloadURL();
+          resolve(downloadURL);
+        } catch (err) {
+          console.error("Storage upload failed, falling back to base64", err);
+          resolve(dataUrl);
+        }
+      } else {
+        resolve(dataUrl);
+      }
+    };
+
     if (file.type.startsWith('image/')) {
       const reader = new FileReader();
       reader.onload = (e) => {
@@ -99,7 +118,7 @@ async function uploadFile(file) {
           canvas.height = height;
           const ctx = canvas.getContext('2d');
           ctx.drawImage(img, 0, 0, width, height);
-          resolve(canvas.toDataURL('image/jpeg', 0.6)); // Highly compressed JPEG
+          uploadToStorage(canvas.toDataURL('image/jpeg', 0.6), file);
         };
         img.onerror = () => reject(new Error("Failed to process image"));
         img.src = e.target.result;
@@ -110,7 +129,7 @@ async function uploadFile(file) {
       // For PDFs, docs etc.
       if (file.size > 500 * 1024) return reject(new Error("File too large for free sync. Please keep non-image files under 500KB."));
       const reader = new FileReader();
-      reader.onload = (e) => resolve(e.target.result);
+      reader.onload = (e) => uploadToStorage(e.target.result, file);
       reader.onerror = () => reject(new Error("Failed to read file"));
       reader.readAsDataURL(file);
     }
@@ -2540,6 +2559,7 @@ function openProfileModal() {
         <button class="btn btn-outline" style="flex:1" onclick="importData()">📥 Restore Backup</button>
       </div>
       <button class="btn btn-outline" style="width:100%; margin-top:8px;" onclick="openCategoriesModal()">🏷️ Manage Categories</button>
+      <button class="btn btn-outline" style="width:100%; margin-top:8px;" onclick="optimizeStorage()">🔧 Fix Sync (Optimize Storage)</button>
       <button class="btn btn-outline" style="width:100%; margin-top:8px;" onclick="openModal('Add Course', buildCourseForm())">📚 Add Course</button>
     </div>
 
@@ -2679,6 +2699,43 @@ function escHtml(str) {
 function capitalize(s) { return s ? s.charAt(0).toUpperCase()+s.slice(1) : ''; }
 
 // ==================== DATA MIGRATION ====================
+async function optimizeStorage() {
+  if (!currentUser) {
+    showToast('You must be signed in to optimize storage.', 'error');
+    return;
+  }
+  
+  showToast('Optimizing storage... Please wait.', 'info');
+  let migrated = 0;
+  
+  // Migrate photos
+  if (STATE.photos && STATE.photos.length > 0) {
+    for (let i = 0; i < STATE.photos.length; i++) {
+      if (STATE.photos[i].url && STATE.photos[i].url.startsWith('data:')) {
+        try {
+          const res = await fetch(STATE.photos[i].url);
+          const blob = await res.blob();
+          const storageRef = storage.ref(`users/${currentUser.uid}/uploads/migrated_${Date.now()}_img.jpg`);
+          const snapshot = await storageRef.put(blob);
+          const downloadURL = await snapshot.ref.getDownloadURL();
+          STATE.photos[i].url = downloadURL;
+          migrated++;
+        } catch(e) {
+          console.error("Failed to migrate photo", e);
+        }
+      }
+    }
+  }
+  
+  if (migrated > 0) {
+    save();
+    showToast(`Successfully optimized ${migrated} photos! Sync should now work perfectly.`, 'success');
+    if (typeof renderPhotos === 'function') renderPhotos(); 
+  } else {
+    showToast('Storage is already optimized! No heavy files found.', 'info');
+  }
+}
+
 function exportData() {
   const data = localStorage.getItem('studentPlanner_v3') || JSON.stringify(STATE);
   const blob = new Blob([data], { type: "application/json" });
