@@ -357,6 +357,21 @@ input, select, textarea { font-family: var(--font); }
   #addCourseBtn { width: 100%; justify-content: center; }
 }
 
+.habit-tracker-table {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  margin-bottom: 20px;
+}
+
+.habit-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 800px;
+}
+
 .habit-table th { background: var(--bg-secondary); font-weight: 700; color: var(--text-muted); font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; }
 .habit-table .habit-name-cell { text-align: left; font-weight: 600; font-size: 13px; color: var(--text-primary); padding-left: 14px; min-width: 150px; }
 .habit-check { width: 24px; height: 24px; border-radius: var(--radius-sm); border: 2px solid var(--border); cursor: pointer; margin: 0 auto; display: flex; align-items: center; justify-content: center; transition: var(--transition); font-size: 14px; }
